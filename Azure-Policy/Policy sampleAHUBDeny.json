@@ -1,0 +1,40 @@
+"policyRule": {
+            "if": {
+              "allOf": [
+                {
+                  "field": "type",
+                  "in": [
+                    "Microsoft.Compute/virtualMachines",
+                    "Microsoft.Compute/VirtualMachineScaleSets"
+                  ]
+                },
+                {
+                  "field": "Microsoft.Compute/licenseType",
+                  "notequals": "Windows_Server"
+                },
+                {
+                  "allOf": [
+                    {
+                      "field": "Microsoft.Compute/virtualMachines/imageOffer",
+                      "in": [
+                        "WindowsServer",
+                        "WindowsServerSemiAnnual"
+                      ]
+                    },
+                    {
+                      "not": {
+                        "field": "Microsoft.Compute/virtualMachines/imageSku",
+                        "in": [
+                          "2016-Datacenter-with-RDSH",
+                          "2016-Nano-Server"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "then": {
+                "effect": "deny"
+            }
+        }

@@ -1,0 +1,37 @@
+tzutil /s "Eastern Standard Time"
+
+Install-Module -Name Az.Storage
+Install-Module -Name AzureAD
+
+$resourceGroupName = "RG-AVD-Storage"
+$storageAccountName = "saavdprofilesxelab"
+
+Connect-AzAccount
+Set-AzContext -Subscription "MS-XE-CSA-AIA-LZ"
+$Subscription =  $(Get-AzContext).Subscription.Id;
+$ApiVersion = '2021-04-01'
+
+$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version={3}' -f $Subscription, $ResourceGroupName, $StorageAccountName, $ApiVersion);
+
+$json = 
+   @{properties=@{azureFilesIdentityBasedAuthentication=@{directoryServiceOptions="AADKERB"}}};
+$json = $json | ConvertTo-Json -Depth 99
+
+$token = $(Get-AzAccessToken).Token
+$headers = @{ Authorization="Bearer $token" }
+
+try {
+    Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
+} catch {
+    Write-Host $_.Exception.ToString()
+    Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
+}
+
+New-AzStorageAccountKey -ResourceGroupName $resourceGroupName -Name $storageAccountName -KeyName kerb1 -ErrorAction Stop
+
+
+$defaultPermission = "StorageFileDataSmbShareContributor" # Set the default permission of your choice
+
+$account = Set-AzStorageAccount -ResourceGroupName $resourceGroupName -AccountName $storageAccountName -DefaultSharePermission $defaultPermission
+
+$account.AzureFilesIdentityBasedAuth

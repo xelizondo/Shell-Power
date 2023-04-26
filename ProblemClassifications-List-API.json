@@ -1,0 +1,404 @@
+{
+  "value": [
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/7e2c375c-2383-b50f-1d14-cdf15f17478b",
+      "name": "7e2c375c-2383-b50f-1d14-cdf15f17478b",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Action groups"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/38d30c86-d4e3-aa14-bdee-167725f7ccd0",
+      "name": "38d30c86-d4e3-aa14-bdee-167725f7ccd0",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Active Directory"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/805b9781-4c0c-9740-b714-af2c69a58af8",
+      "name": "805b9781-4c0c-9740-b714-af2c69a58af8",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Alerts"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/41dddec0-4071-9086-60b7-fd94ab2a6c6d",
+      "name": "41dddec0-4071-9086-60b7-fd94ab2a6c6d",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Application Insights"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/f5327750-42cb-2667-1086-f53ee3c23c0d",
+      "name": "f5327750-42cb-2667-1086-f53ee3c23c0d",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Autoscale"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/2ef73080-8fd9-19d2-de9c-fc8594dcf71f",
+      "name": "2ef73080-8fd9-19d2-de9c-fc8594dcf71f",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Database for MariaDB"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/a651f078-f88c-b811-4720-8943f30ffb7b",
+      "name": "a651f078-f88c-b811-4720-8943f30ffb7b",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Database for MySQL single server"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/404eb2fd-b3d5-7751-3063-1e8cd0fa50e7",
+      "name": "404eb2fd-b3d5-7751-3063-1e8cd0fa50e7",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Database for PostgreSQL single server"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/f3288da4-4d60-5b10-7091-98dcf73ca91f",
+      "name": "f3288da4-4d60-5b10-7091-98dcf73ca91f",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Healthcare APIs"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/4c6012da-5dcf-7a3a-43b4-99ec73125c83",
+      "name": "4c6012da-5dcf-7a3a-43b4-99ec73125c83",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Lab Services"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/1e43cc7f-7ff1-9a9a-2b32-eddc9c67c618",
+      "name": "1e43cc7f-7ff1-9a9a-2b32-eddc9c67c618",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Load Testing"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/6181ccf6-28d6-7843-76d4-4f3c1ad88e7a",
+      "name": "6181ccf6-28d6-7843-76d4-4f3c1ad88e7a",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Purview"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/a8bd999a-1389-6508-d4a8-bda7616e88e3",
+      "name": "a8bd999a-1389-6508-d4a8-bda7616e88e3",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Quantum"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/6a6d517d-5de7-f0ed-356f-e70fa3ee2a09",
+      "name": "6a6d517d-5de7-f0ed-356f-e70fa3ee2a09",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure RemoteApp"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/0bc962e0-5f61-f291-1919-24a6241c843a",
+      "name": "0bc962e0-5f61-f291-1919-24a6241c843a",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Azure Synapse Analytics"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/831b2fb3-4db3-3d32-af35-bbb3d3eaeba2",
+      "name": "831b2fb3-4db3-3d32-af35-bbb3d3eaeba2",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Batch"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/37700aeb-d9ba-400a-31db-ee2ef09aec97",
+      "name": "37700aeb-d9ba-400a-31db-ee2ef09aec97",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "CDN"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/e0709e43-3f96-13c1-050f-e3b0891922b0",
+      "name": "e0709e43-3f96-13c1-050f-e3b0891922b0",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Cloud Services"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/2a0a9b68-0981-14f4-d590-a7eecb8d6bee",
+      "name": "2a0a9b68-0981-14f4-d590-a7eecb8d6bee",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Cognitive Services"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/e12e3d1d-7fa0-af33-c6d0-3c50df9658a3",
+      "name": "e12e3d1d-7fa0-af33-c6d0-3c50df9658a3",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Compute-VM (cores-vCPUs) subscription limit increases"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/a11041c8-bf9f-820b-f1ef-c859995c6040",
+      "name": "a11041c8-bf9f-820b-f1ef-c859995c6040",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Container Instances"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/a8237f6d-9e1e-1b82-c001-723cb8ad8cfa",
+      "name": "a8237f6d-9e1e-1b82-c001-723cb8ad8cfa",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Cosmos DB"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/de105c19-f61a-b826-0761-aa51bb935682",
+      "name": "de105c19-f61a-b826-0761-aa51bb935682",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Data Factory"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/6c436f2a-bf67-9d05-a887-67ff74f512c0",
+      "name": "6c436f2a-bf67-9d05-a887-67ff74f512c0",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Data Lake Analytics"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/fa707566-4d6b-35b8-b8da-fb28b5f3dfce",
+      "name": "fa707566-4d6b-35b8-b8da-fb28b5f3dfce",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "DNS"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/8d34ed57-45e4-7de5-c098-282a560812b0",
+      "name": "8d34ed57-45e4-7de5-c098-282a560812b0",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Event Hub"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/fb2b3a54-7782-1ec1-30f1-9b13c6071c9d",
+      "name": "fb2b3a54-7782-1ec1-30f1-9b13c6071c9d",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Genomics"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/917919a1-68f9-199b-e6b2-0f20631763e4",
+      "name": "917919a1-68f9-199b-e6b2-0f20631763e4",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "HDInsight"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/7a6d4622-bdc6-24ff-1b47-25bc03ca0a04",
+      "name": "7a6d4622-bdc6-24ff-1b47-25bc03ca0a04",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "HPC Cache"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/9c6b13e6-097a-36b1-fe05-3195b5e20942",
+      "name": "9c6b13e6-097a-36b1-fe05-3195b5e20942",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Machine Learning Service: Cluster Quota"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/8203c025-412c-f0c2-229a-142d6267f2ee",
+      "name": "8203c025-412c-f0c2-229a-142d6267f2ee",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Machine Learning Service: Endpoint Limits"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/28219731-78c4-da47-b70a-120b7c35856e",
+      "name": "28219731-78c4-da47-b70a-120b7c35856e",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Machine Learning Service: Spark vCore Quota"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/c8800fe7-23e4-8cca-0d90-2379734c0006",
+      "name": "c8800fe7-23e4-8cca-0d90-2379734c0006",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Machine Learning Service: Virtual Machine Quota"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/a12efd28-299b-2fef-a7c4-91424f798270",
+      "name": "a12efd28-299b-2fef-a7c4-91424f798270",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Managed Prometheus"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/eb747862-5a4c-b6de-e173-02095d17fd4d",
+      "name": "eb747862-5a4c-b6de-e173-02095d17fd4d",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Media Services"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/16becfc4-de9a-4db5-90fd-5051b67ad309",
+      "name": "16becfc4-de9a-4db5-90fd-5051b67ad309",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Microsoft Dev Box"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/d37c211c-4257-d859-ffa8-68bd54d8d188",
+      "name": "d37c211c-4257-d859-ffa8-68bd54d8d188",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Mobile Engagement"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/3460e0f5-0881-e6b5-6abd-07b4f233c000",
+      "name": "3460e0f5-0881-e6b5-6abd-07b4f233c000",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Multi - Factor Authentication"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/4b994745-d2fe-c6cf-00d0-b358c8526f2d",
+      "name": "4b994745-d2fe-c6cf-00d0-b358c8526f2d",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Networking"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/599a339a-a959-d783-24fc-81a42d3fd5fb",
+      "name": "599a339a-a959-d783-24fc-81a42d3fd5fb",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Other Requests"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/2f3107e0-e21c-8c17-391b-0f9c4ca5f47a",
+      "name": "2f3107e0-e21c-8c17-391b-0f9c4ca5f47a",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Search"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/1f8b6f41-52fd-aaec-1cbb-fca2273ae421",
+      "name": "1f8b6f41-52fd-aaec-1cbb-fca2273ae421",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Service Bus"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/95bae7c6-a1ad-9477-7eb5-706424cfb6b6",
+      "name": "95bae7c6-a1ad-9477-7eb5-706424cfb6b6",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "SQL database"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/83ab35e7-7b4d-819e-be8f-3c20a8554920",
+      "name": "83ab35e7-7b4d-819e-be8f-3c20a8554920",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "SQL Database Managed Instance"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/2e1abb1b-2428-9a2f-6521-01c708d0bb4b",
+      "name": "2e1abb1b-2428-9a2f-6521-01c708d0bb4b",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Storage: Accounts limit for Classic"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/22f96a7f-37b3-1504-0258-909e9f5ab3ac",
+      "name": "22f96a7f-37b3-1504-0258-909e9f5ab3ac",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Storage: Azure NetApp Files limits"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/e2c2bb3e-3ec6-5f1b-0eb0-53acab1f2b3a",
+      "name": "e2c2bb3e-3ec6-5f1b-0eb0-53acab1f2b3a",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Storage: Managed Disks limits"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/42f49519-c88b-0328-cc2a-96919e4f5655",
+      "name": "42f49519-c88b-0328-cc2a-96919e4f5655",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Storage: Per account limits"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/10c0d1d7-a9dd-ffe2-bfe7-fa47f13163fe",
+      "name": "10c0d1d7-a9dd-ffe2-bfe7-fa47f13163fe",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Stream Analytics"
+      }
+    },
+    {
+      "id": "/providers/Microsoft.Support/services/06bfd9d3-516b-d5c6-5802-169c800dec89/problemClassifications/ecb0610e-9f64-003f-89a3-a24c01dc2706",
+      "name": "ecb0610e-9f64-003f-89a3-a24c01dc2706",
+      "type": "Microsoft.Support/problemClassifications",
+      "properties": {
+        "displayName": "Traffic Manager"
+      }
+    }
+  ]
+}

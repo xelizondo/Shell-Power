@@ -1,0 +1,47 @@
+{
+    "mode": "All",
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "description": "The effect determines what happens when the policy rule is matched."
+        },
+        "allowedValues": [
+          "modify",
+          "audit"
+        ],
+        "defaultValue": "modify"
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Network/virtualNetworks/subnets"
+          },
+          {
+            "not": {
+              "field": "Microsoft.Network/virtualNetworks/subnets/privateEndpointNetworkPolicies",
+              "equals": "Enabled"
+            }
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]",
+        "details": {
+          "roleDefinitionIds": [
+            "/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+          ],
+          "operations": [
+            {
+              "operation": "addOrReplace",
+              "field": "Microsoft.Network/virtualNetworks/subnets/privateEndpointNetworkPolicies",
+              "value": "Enabled"
+            }
+          ]
+        }
+      }
+    }
+  }

@@ -1,0 +1,116 @@
+MyLocation=westus2
+MyRG=RG-Hub-WestUS2
+MyvWAN=vWAN-WestUS2
+MyvHub=vhub-westus2
+MyvHubAddressing=10.40.0.0/23
+MyvWANSKU=Standard
+VNetConnectionName=AVD_VNet-WestUS2
+ConnectedVNet=vnet-WestUS2-core
+vHubAzFWtier=Premium
+FWPolicy=FWPol-1-Hub-WestUS2
+VPNSite=Home-VPN
+
+az network vwan create \
+                    --name $MyvWAN \
+                    --resource-group $MyRG \
+                    --location $MyLocation \
+                    --branch-to-branch-traffic true \
+                    --type $MyvWANSKU
+
+az network vhub create --address-prefix $MyvHubAddressing \
+                       --name $MyvHub \
+                       --resource-group $MyRG \
+                       --vwan $MyvWAN \
+                       --location $MyLocation \
+                       --sku $MyvWANSKU
+
+az network vpn-gateway create --name vpngw-$MyvHub \
+                              --resource-group $MyRG \
+                              --vhub $MyvHub \
+                              --scale-unit 1
+                              [--asn]
+                              [--bgp-peering-address]
+                              [--location]
+                              [--no-wait]
+                              [--peer-weight]
+                              [--scale-unit]
+                              [--tags]
+
+az network express-route gateway create --name xrgw-$MyvHub \
+                                        --resource-group $MyRG \
+                                        --virtual-hub $MyvHub
+                                        [--location]
+                                        [--max-val]
+                                        [--min-val]
+                                        [--subscription]
+                                        [--tags]
+
+
+az network firewall create -g $MyRG -n AzFW-$MyvHub --sku AZFW_Hub --virtual-hub $MyvHub --public-ip-count 1
+
+az network firewall create \
+                    -g $MyRG \
+                    -n AzFW-$MyvHub \
+                    --sku AZFW_Hub \
+                    --virtual-hub $MyvHub \
+                    --tier Premium \
+                    --firewall-policy $FWPolicy
+                    --public-ip-count 1 \
+
+
+                    [--location $MyLocation]
+                    [--threat-intel-mode Alert]
+                    [--allow-active-ftp true]
+                    [--enable-dns-proxy true]
+                           [--private-ranges]
+                           [--tags]
+                           [--zones {1, 2, 3}]
+                        [--dns-servers]
+
+az network vhub connection create --name $VNetConnectionName \
+                                  --remote-vnet $ConnectedVNet  \
+                                  --resource-group $MyRG \
+                                  --vhub-name $MyvHub
+                                  [--address-prefixes]
+                                  [--associated]
+                                  [--internet-security {false, true}]
+                                  [--labels]
+                                  [--next-hop]
+                                  [--no-wait]
+                                  [--propagated]
+                                  [--remote-vnet-transit {false, true}]
+                                  [--route-name]
+                                  [--use-hub-vnet-gateways {false, true}]
+
+az network vpn-site create --location $MyLocation \
+                        --ip-address 162.207.71.133 \
+                        --name $VPNSite \
+                        --resource-group $MyRG \
+                        --virtual-wan $MyvWAN \
+                        --asn 65505 \
+                        --bgp-peering-address 192.168.1.1 \
+                        --device-vendor pfsense \
+                        --link-speed 1000 \
+                        [--device-model MyDeviceModel] 
+                        [--address-prefixes }
+                           [--no-wait]
+                           [--peer-weight]
+                           [--security-site {false, true}]
+                           [--site-key]
+                           [--tags]
+                           [--virtual-wan]
+                           [--with-link {false, true}]
+
+
+
+
+$azfw = Get-AzFirewall -Name "AzFW-vhub-westus2" -ResourceGroupName "RG-Hub-WestUS2"
+$azfw.Deallocate()
+Set-AzFirewall -AzureFirewall $azfw
+
+
+$azfw = Get-AzFirewall -Name "AzFW-vhub-westus2" -ResourceGroupName "RG-Hub-WestUS2"
+$hub = get-azvirtualhub -ResourceGroupName "RG-Hub-WestUS2" -name "vhub-westus2"
+$azfw.Sku.Tier="Premium"
+$azfw.Allocate($hub.id)
+Set-AzFirewall -AzureFirewall $azfw

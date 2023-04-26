@@ -1,0 +1,105 @@
+routeServerSubnetPrefix="<Route Server Subnet address prefix x.x.x.x/xx>" 
+bgpNvaSubnetGateway="BGP NVA Subnet Gateway IP address"
+sudo -s
+dnf install frr -y 
+sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons 
+touch /etc/frr/bgpd.conf 
+chown frr /etc/frr/bgpd.conf 
+chmod 640 /etc/frr/bgpd.conf 
+systemctl enable frr --now 
+
+ip route add $routeServerSubnetPrefix via $bgpNvaSubnetGateway dev eth0
+
+
+conf term 
+! 
+route-map SET-NEXT-HOP-FW permit 10 
+set ip next-hop <Firewall Private IP address> 
+exit 
+! 
+router bgp 65111 
+no bgp ebgp-requires-policy 
+neighbor <IP address of Route Server instance #0> remote-as 65515   
+neighbor <IP address of Route Server instance #0> ebgp-multihop 2 
+neighbor <IP address of Route Server instance #1> remote-as 65515  
+neighbor <IP address of Route Server instance #1> ebgp-multihop 2 
+network 0.0.0.0/0
+network <Existing Hub VNet address space>
+network <On-premises address space>
+! 
+address-family ipv4 unicast 
+  neighbor <IP address of Route Server instance #0> route-map SET-NEXT-HOP-FW out 
+  neighbor <IP address of Route Server instance #1> route-map SET-NEXT-HOP-FW out 
+exit-address-family 
+! 
+exit 
+! 
+exit 
+! 
+write file 
+! 
+
+
+
+
+
+routeServerSubnetPrefix="172.25.0.128/27"
+bgpNvaSubnetGateway="172.25.2.33"
+sudo -s
+dnf install frr -y 
+sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons 
+touch /etc/frr/bgpd.conf 
+chown frr /etc/frr/bgpd.conf 
+chmod 640 /etc/frr/bgpd.conf 
+systemctl enable frr --now 
+ip route add $routeServerSubnetPrefix via $bgpNvaSubnetGateway dev eth0
+
+
+sudo vtysh
+
+conf term 
+! 
+route-map SET-NEXT-HOP-FW permit 10 
+set ip next-hop 172.25.0.68 
+exit 
+! 
+router bgp 65111 
+no bgp ebgp-requires-policy 
+neighbor 172.25.0.132 remote-as 65515   
+neighbor 172.25.0.132 ebgp-multihop 2 
+neighbor 172.25.0.133 remote-as 65515  
+neighbor 172.25.0.133 ebgp-multihop 2 
+network 0.0.0.0/0
+network 172.26.0.0/22
+network 192.168.1.0/24
+! 
+address-family ipv4 unicast 
+  neighbor 172.25.0.132 route-map SET-NEXT-HOP-FW out 
+  neighbor 172.25.0.133 route-map SET-NEXT-HOP-FW out 
+exit-address-family 
+! 
+exit 
+! 
+exit 
+! 
+write file 
+!
+
+
+sudo systemctl restart frr.service
+
+
+route add -net 172.16.26.0/22 gw 172.25.2.33
+route add -net 192.168.1.0/24 gw 172.25.2.33
+route del -net 192.168.0.0/16
+
+
+$routes = @{
+    RouteServerName = 'xe-ars'
+    ResourceGroupName = 'XE-Network'
+    PeerName = 'nva-bgp'
+}
+Get-AzRouteServerPeerLearnedRoute @routes | ft
+
+
+

@@ -1,0 +1,29 @@
+az account set --subscription "LMB Internal MSFT Consumption"
+az account set --subscription "SAP CSA Team Subscription"
+
+sourceDiskName="SAP-Latest"
+sourceRG="test-one_group"
+targetDiskName="sap-wvd-image"
+targetLocation="eastus2"
+targetRG="cloudshell-rg"
+
+
+sourceDiskSizeBytes=$(az disk show -g $sourceRG -n $sourceDiskName --query '[diskSizeBytes]' -o tsv)
+az disk create -g $targetRG -n $targetDiskName -l $targetLocation --for-upload --upload-size-bytes 137438953984 --sku StandardSSD_LRS
+#az disk create -g $targetRG -n $targetDiskName -l $targetLocation --for-upload --upload-size-bytes $(($sourceDiskSizeBytes+512)) --sku StandardSSD_LRS
+targetSASURI=$(az disk grant-access -n $targetDiskName -g $targetRG  --access-level Write --duration-in-seconds 86400 -o tsv)
+sourceSASURI="https://md-ssd-wchgr2hjcvk5.blob.core.windows.net/q221b3nv1d1q/abcd?sv=2018-03-28&sr=b&si=2708a744-9208-4859-9e25-05017c9d51e0&sig=SthTtxyN9JMb5msnmavDzgK%2Bha158jLYLQdvHHTKp7Q%3D"
+#sourceSASURI=$(az disk grant-access -n $sourceDiskName -g $sourceRG --duration-in-seconds 86400 --query [accessSas] -o tsv)
+azcopy copy $sourceSASURI $targetSASURI --blob-type PageBlob
+
+#az disk revoke-access -n $sourceDiskName -g $sourceRG
+az disk revoke-access -n $targetDiskName -g $targetRG
+
+
+
+az vm create \
+    --resource-group cloudshell-rg \
+    --location eastus2 \
+    --name wvd-sap \
+	--os-type windows \
+    --attach-os-disk sap-wvd-image

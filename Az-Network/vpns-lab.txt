@@ -1,0 +1,42 @@
+rg=RG-Hub-Core 
+AzureHubName=vNET-Hub
+AzFwName=AzFW-Hub-EastUS
+OnPremVnetAddressSpace=192.168.1.0/24 
+AzureRegionVPN=192.168.70.0/23
+
+
+#UDR for Hub traffic to Azure Firewall (disables BGP propagation)
+## Create UDR + Disable BGP Propagation
+az network route-table create --name RT-Hub-to-AzFW --resource-group $rg --location $location --disable-bgp-route-propagation true
+
+## Default route to AzFW
+az network route-table route create --resource-group $rg --name Default-to-AzFw --route-table-name RT-lab-Hub-to-AzFW  \
+--address-prefix 0.0.0.0/0 \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $AzFwName --resource-group $rg --query "ipConfigurations[].privateIpAddress" -o tsv)
+
+
+#UDR to send traffic between ExpressRoute environment and VPN Onprem and between Hub and spoke via Azure Firewall
+az network route-table create --name RT-GWSubnet-to-AzFW --resource-group $rg --location $location 
+
+## Azure Hub Servers Subnet
+az network route-table route create --resource-group $rg --name HubServersSubnet-via-AzFW --route-table-name RT-lab-GWSubnet-to-AzFW \
+--address-prefix 172.31.250.0/26 \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $AzFwName --resource-group $rg --query "ipConfigurations[].privateIpAddress" -o tsv)
+
+## OnPrem VPN
+az network route-table route create --resource-group $rg --name OnPremVPN-to-AzFw --route-table-name RT-lab-GWSubnet-to-AzFW \
+--address-prefix $OnPremVnetAddressSpace \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $AzFwName --resource-group $rg --query "ipConfigurations[].privateIpAddress" -o tsv)
+
+
+## Other-Az-Region-VPN
+az network route-table route create --resource-group $rg --name AzNCUS-to-AzFw --route-table-name RT-lab-GWSubnet-to-AzFW \
+--address-prefix $AzureRegionVPN \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $AzFwName --resource-group $rg --query "ipConfigurations[].privateIpAddress" -o tsv)
+
+## Associating RT-to-GWSubnet to GatewaySubnet
+az network vnet subnet update -n GatewaySubnet -g $rg --vnet-name $AzureHubName --route-table RT-lab-GWSubnet-to-AzFW

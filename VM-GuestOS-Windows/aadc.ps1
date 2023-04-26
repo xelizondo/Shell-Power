@@ -1,0 +1,2 @@
+Install-WindowsFeature -Name AD-Domain-Services
+Install-ADDSForest -DomainName micro-hack.local -SafeModeAdministratorPassword (ConvertTo-SecureString -String "microhack-12345%" -AsPlainText -Force) -Force -SkipPreChecks
