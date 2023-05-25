@@ -1,0 +1,15 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "subscriptionId1": {
+        "value": "e6c8ff38-77ff-4ad0-8778-7db1b31b441b"
+      },
+      "subscriptionId2": {
+        "value": "2b73f762-264b-40ac-9ade-a1f95c5b2195"
+      },
+      "subscriptionId3": {
+        "value": "b84ad984-c030-4e64-a07a-c07da4d066b4"
+      }
+    }
+  }
