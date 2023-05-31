@@ -1,4 +1,4 @@
-#This script will loop through subscriptions and resource group that the user running the script is entitled to and export the RBAC assignments to a CSV file.
+#This script will loop through each subscription and resource group that the user running the script is entitled to and export the RBAC assignments to a CSV file.
 
 
 Get-AzSubscription | foreach-object {
