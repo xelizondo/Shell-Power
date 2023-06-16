@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Pre-Requisites
+az config set extension.use_dynamic_install=yes_without_prompt
 echo validating pre-requisites
 az extension add --name virtual-wan 
 az extension add --name azure-firewall 
@@ -19,7 +20,7 @@ hub1name=sechub1-eus #set Hub1 name
 hub2name=sechub2-eus2 #set Hub2 name
 username=az-admin #set username
 password="pwd-here" #set VMs password
-vmsize=Standard_B2ms #set VM Size
+vmsize=Standard_B2s #set VM Size
 firewallsku=Standard #Azure Firewall SKU Standard or Premium
 
 #Set subscription context
@@ -58,17 +59,8 @@ az network vnet create --address-prefixes 172.16.4.0/24 -n spoke4 -g $rg -l $reg
 az network vnet create --address-prefixes 172.16.5.0/24 -n spoke5 -g $rg -l $region2 --subnet-name main --subnet-prefixes 172.16.5.0/27 --output none
 az network vnet create --address-prefixes 172.16.6.0/24 -n spoke6 -g $rg -l $region2 --subnet-name main --subnet-prefixes 172.16.6.0/27 --output none
 
-echo Creating VMs in both branches...
-# create a VM in each branch spoke Win2019Datacenter
-
-az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
-
-#az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
-#az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
-
 echo Creating NSGs in both branches...
-#Update NSGs:
+#NSGs:
 az network nsg create --resource-group $rg --name default-nsg-$hub1name-$region1 --location $region1 -o none
 az network nsg create --resource-group $rg --name default-nsg-$hub2name-$region2 --location $region2 -o none
 
@@ -95,14 +87,23 @@ az network vnet-gateway create -n branch1-vpngw --public-ip-addresses branch1-vp
 az network vnet subnet create -g $rg --vnet-name branch2 -n GatewaySubnet --address-prefixes 10.200.100.0/26 --output none
 az network vnet-gateway create -n branch2-vpngw --public-ip-addresses branch2-vpngw-pip -g $rg --vnet branch2 --asn 65009 --gateway-type Vpn -l $region2 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait
 
+echo Creating VMs in both branches...
+# create a VM in each branch spoke Win2019Datacenter
+
+az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
+az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
+
+#az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
+#az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
+
 echo Creating Spoke VMs...
 # create a VM in each connected spoke
-az vm create -n spoke1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke1 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n spoke2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke2 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n spoke3VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke3 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n spoke4VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke4 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n spoke5VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke5 --admin-username $username --admin-password $password --nsg "" --no-wait
-az vm create -n spoke6VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke6 --admin-username $username --admin-password $password --nsg "" --no-wait
+az vm create -n spoke1VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke1 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n spoke2VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke2 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n spoke3VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name spoke3 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n spoke4VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke4 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n spoke5VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke5 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n spoke6VM -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name spoke6 --admin-username $username --admin-password $password --no-wait --nsg ""
 #Enable boot diagnostics for all VMs in the resource group (Serial console)
 #Create Storage Account (boot diagnostics + serial console)
 let "randomIdentifier1=$RANDOM*$RANDOM" 
@@ -704,4 +705,10 @@ $firewall.deallocate()
 $firewall | Set-AzFirewall -AsJob
 
 
+az network nic show-effective-route-table -g $rg -n spoke1VMVMNic --output table
+
+
 az group delete -g $rg --no-wait
+
+
+

@@ -1,0 +1,106 @@
+################################################
+region1=eastus
+region2=westus
+rg=rg-avmn-lab
+avnmname=avmn-$region1
+avnmscope=subscriptions="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737"
+netgroup1=$region1-prod-vnets
+netgroup2=$region1-nonprod-vnets
+netgroup3=$region2-prod-vnets
+netgroup4=$region2-nonprod-vnets
+
+az group create -n $rg -l $region1 --output none
+az network manager create --location $region1 --resource-group $rg \
+    --name $avnmname \
+    --network-manager-scopes subscriptions="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737" \
+    --scope-accesses "SecurityAdmin" "Connectivity" \
+    --description $rg
+    --output none
+
+az network manager group create --name $netgroup1 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup1 \
+    --output none
+
+az network manager group create --name $netgroup2 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup2 \
+    --output none
+
+az network manager group create --name $netgroup3 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup3 \
+    --output none
+
+az network manager group create --name $netgroup4 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup4 \
+    --output none
+
+az network vnet create --name "VNetA" --resource-group $rg --location $region1 --address-prefix "10.1.0.0/16" --tags "NetworkType=NonProd" --output none
+az network vnet create --name "VNetB" --resource-group $rg --location $region1 --address-prefix "10.2.0.0/16" --tags "NetworkType=NonProd" --output none
+az network vnet create --name "VNetC" --resource-group $rg --location $region1 --address-prefix "10.3.0.0/16" --tags "NetworkType=Prod" --output none
+az network vnet create --name "VNetD" --resource-group $rg --location $region1 --address-prefix "10.4.0.0/16" --tags "NetworkType=Prod" --output none
+az network vnet create --name "VNetE" --resource-group $rg --location $region2 --address-prefix "10.7.0.0/16" --tags "NetworkType=NonProd" --output none
+az network vnet create --name "VNetF" --resource-group $rg --location $region2 --address-prefix "10.8.0.0/16" --tags "NetworkType=NonProd" --output none
+az network vnet create --name "VNetG" --resource-group $rg --location $region2 --address-prefix "10.9.0.0/16" --tags "NetworkType=Prod" --output none
+az network vnet create --name "VNetH" --resource-group $rg --location $region2 --address-prefix "10.10.0.0/16" --tags "NetworkType=Prod" --output none
+
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetA" --address-prefix "10.1.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetB" --address-prefix "10.2.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetC" --address-prefix "10.3.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetD" --address-prefix "10.4.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetE" --address-prefix "10.7.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetF" --address-prefix "10.8.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetG" --address-prefix "10.9.0.0/27" --output none
+az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetH" --address-prefix "10.10.0.0/27" --output none
+
+az network manager group static-member create --name "VNetA" --network-group $netgroup2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetA'].id" -o tsv)
+
+az network manager group static-member create --name "VNetB" --network-group $netgroup2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetB'].id" -o tsv)
+    
+az network manager group static-member create --name "VNetC" --network-group $netgroup1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetC'].id" -o tsv) 
+
+az network manager group static-member create --name "VNetD" --network-group $netgroup1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetD'].id" -o tsv)
+
+az network manager group static-member create --name "VNetE" --network-group $netgroup4 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetE'].id" -o tsv)
+
+az network manager group static-member create --name "VNetF" --network-group $netgroup4 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetF'].id" -o tsv)
+
+az network manager group static-member create --name "VNetG" --network-group $netgroup3 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetG'].id" -o tsv)
+
+az network manager group static-member create --name "VNetH" --network-group $netgroup3 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetH'].id" -o tsv)
+
+az network manager connect-config create --configuration-name "Mesh-Prod" --description "Production Mesh Connectivity" --is-global true \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup1 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup3 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --connectivity-topology "Mesh" \
+    --network-manager-name $avnmname \
+    --resource-group $rg \
+    --output none
+
+az network manager connect-config create --configuration-name "Mesh-NonProd" --description "Non-Production Mesh Connectivity" --is-global true \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup2 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup4 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --connectivity-topology "Mesh" \
+    --network-manager-name $avnmname \
+    --resource-group $rg \
+    --output none
+
+az network manager post-commit --network-manager-name $avnmname --commit-type "Connectivity" --resource-group $rg --target-locations $region1 $region2 \
+    --configuration-ids $(az network manager connect-config show --configuration-name "Mesh-Prod" --network-manager-name $avnmname --resource-group $rg --query id -o tsv) $(az network manager connect-config show --configuration-name "Mesh-NonProd" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
+    
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetA"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetB"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetC"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetD"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetE"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetF"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetG"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetH"
+
+az group delete -g $rg --no-wait
