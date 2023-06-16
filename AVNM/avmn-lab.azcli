@@ -3,16 +3,18 @@ region1=eastus
 region2=westus
 rg=rg-avmn-lab
 avnmname=avmn-$region1
-avnmscope=subscriptions="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737"
+SubscriptionID "SubID"
 netgroup1=$region1-prod-vnets
 netgroup2=$region1-nonprod-vnets
 netgroup3=$region2-prod-vnets
 netgroup4=$region2-nonprod-vnets
 
+az account set --subscription $SubscriptionID
+
 az group create -n $rg -l $region1 --output none
 az network manager create --location $region1 --resource-group $rg \
     --name $avnmname \
-    --network-manager-scopes subscriptions="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737" \
+    --network-manager-scopes subscriptions="/subscriptions/$(az account list --query "[?isDefault == \`true\`].id" --all -o tsv)" \
     --scope-accesses "SecurityAdmin" "Connectivity" \
     --description $rg
     --output none
