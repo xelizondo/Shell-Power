@@ -1,0 +1,24 @@
+| mvexpand tags
+| extend tagKey = tostring(bag_keys(tags)[0])
+| extend tagValue = tostring(tags[tagKey])
+| summarize resources = makeset(id) by tagKey, tagValue
+   | join kind = fullouter(
+       resourcecontainers
+       | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+       | mvexpand tags
+       | extend tagKey = tostring(bag_keys(tags)[0])
+       | extend tagValue = tostring(tags[tagKey])
+       | summarize RGs = makeset(resourceGroup) by tagKey, tagValue
+   ) on tagKey, tagValue
+| project resources, RGs, tagKey = coalesce(tagKey, tagKey1), tagValue = coalesce(tagValue, tagValue1)
+ 
+(using Union instead) and it also worked:
+ 
+resources
+| project id, tags
+| union withsource=resources kind=outer 
+  (resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups')
+| mvexpand tags
+| extend tagKey = tostring(bag_keys(tags)[0])
+| extend tagValue = tostring(tags[tagKey])
+| summarize RGs = makeset(resourceGroup), resourceIds = makeset(id) by tagKey, tagValue

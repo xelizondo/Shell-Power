@@ -1,0 +1,90 @@
+
+desktopvirtualizationresources
+| extend VMRid = tolower(properties.resourceId), 
+        Sessions = toint(properties.sessions), 
+        hpId = tolower(trim_end("/sessionhosts/.+", id)),
+        Status = tostring(properties.status)
+| summarize  SessionHosts = count(), 
+            ActiveSessions=sum(Sessions),
+            Available = countif(Status == "Available"),
+            Shutdown = countif(Status == "Shutdown"),
+            Unavailable = countif(Status == "Unavailable"),
+            UpgradeFailed = countif(Status == "UpgradeFailed"),
+            Upgrading = countif(Status == "Upgrading"),
+            ["Active Hosts with 0 Sessions"] = countif(Sessions == 0 and Status == "Available")
+ 
+it gives you a count of session hosts, how many are active, available, shutdown etc
+ like 2
+[1:25 PM] Billy York
+desktopvirtualizationresources
+
+| extend VMRid = tolower(properties.resourceId), Sessions = toint(properties.sessions), hpId = tolower(trim_end("/sessionhosts/.+", id))
+
+|project id=VMRid, Sessions
+
+| join kind=inner (resources
+
+    | where type =~ "microsoft.compute/virtualmachines" or type =~ "microsoft.hybridcompute/machines"
+
+    | extend id = tolower(id), location=iff(type =~ "microsoft.hybridcompute/machines", "Azure Stack HCI", location)
+
+    ) on id
+
+| summarize  Count = count(), Sessions=sum(Sessions) by location
+
+| sort by Count desc, Sessions desc
+
+ 
+i dont remember the exact purpose of this one
+ like 1
+[1:26 PM] Billy York
+personal vs pooled      
+ 
+resources
+
+    | where properties.hostPoolType == "Pooled"
+
+    | summarize value=count()
+
+    | project metric="Total pooled host pools", value
+
+    | union (
+
+    resources
+
+    | where properties.hostPoolType == "Personal"
+
+    | summarize value=count()
+
+    | project metric="Total personal host pools", value
+
+    )
+[1:27 PM] Billy York
+total session hosts and total host pools
+ 
+resources
+| summarize value=count()
+| project metric="Total host pools", value
+| union (
+resources
+| project id = tolower(id)
+| join (desktopvirtualizationresources
+    |  project id = tolower(trim_end("/sessionhosts/.+", id))) on id
+| summarize value = count()
+| project metric="Total session hosts", value
+)
+
+
+resources
+| where type == 'microsoft.desktopvirtualization/hostpools'
+| summarize value=count()
+| project metric="Total host pools", value
+| union (
+resources
+| where type == 'microsoft.desktopvirtualization/hostpools'
+| project id = tolower(id)
+| join (desktopvirtualizationresources
+    |  project id = tolower(trim_end("/sessionhosts/.+", id))) on id
+| summarize value = count()
+| project metric="Total session hosts", value
+)

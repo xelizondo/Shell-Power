@@ -2,6 +2,7 @@ git clone https://github.com/Azure/ALZ-Bicep.git
 git clone https://github.com/Azure/terraform-azurerm-caf-enterprise-scale.git
 git clone https://github.com/xelizondo/bicep-lz-vending.git
 curl -O https://raw.githubusercontent.com/jtracey93/PublicScripts/master/Azure/PowerShell/Enterprise-scale/Wipe-ESLZAzTenant.ps1
+curl -O https://raw.githubusercontent.com/amitlals/SAP-on-Azure-Scripts-and-Utilities/main/AvZone-Latency-Test/AvZone-Latency-Test.ps1
 
 New-AzTenantDeployment `
 -TemplateFile infra-as-code/bicep/modules/managementGroups/managementGroups.bicep `

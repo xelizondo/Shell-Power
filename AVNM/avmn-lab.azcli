@@ -1,9 +1,10 @@
 ################################################
+az config set extension.use_dynamic_install=yes_without_prompt
 region1=eastus
 region2=westus
-rg=rg-avmn-lab
+rg=lab-vwan-intra
 avnmname=avmn-$region1
-SubscriptionID "SubID"
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"
 netgroup1=$region1-prod-vnets
 netgroup2=$region1-nonprod-vnets
 netgroup3=$region2-prod-vnets
@@ -92,10 +93,35 @@ az network manager connect-config create --configuration-name "Mesh-NonProd" --d
     --network-manager-name $avnmname \
     --resource-group $rg \
     --output none
-
+## Create a Security Admin Rule
+az network manager security-admin-config create --resource-group $rg --configuration-name "security-config-1" --network-manager-name $avnmname \
+    --description "My Security Config 1" --apply-on none
+## Create a rule collection under the Security Admin Rule
+az network manager security-admin-config rule-collection create --resource-group $rg --network-manager-name $avnmname \
+    --configuration-name "security-config-1" --rule-collection-name "RuleCollection1" --description "Rule Collection 1" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup1 \
+    --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)"
+az network manager security-admin-config rule-collection create --resource-group $rg --network-manager-name $avnmname \
+    --configuration-name "security-config-1" --rule-collection-name "RuleCollection2" --description "Rule Collection 2" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup2 \
+    --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)"
+## Create a rule under the rule collection 
+az network manager security-admin-config rule-collection rule create --resource-group $rg --configuration-name "security-config-1" \
+    --network-manager-name $avnmname --rule-collection-name "RuleCollection1" --rule-name "RuleCollection1-Rule2" --kind "Custom" \
+    --protocol "Tcp" --access "Allow" --priority 33 --direction "Inbound" \
+    --sources address-prefix="192.168.0.0/24" address-prefix-type="IPPrefix" \
+    --sources address-prefix="192.168.1.0/24" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.10.0/24" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.11.0/24" address-prefix-type="IPPrefix" \
+    --dest-port-ranges 22
+## Deploy the connectivity configuration
 az network manager post-commit --network-manager-name $avnmname --commit-type "Connectivity" --resource-group $rg --target-locations $region1 $region2 \
     --configuration-ids $(az network manager connect-config show --configuration-name "Mesh-Prod" --network-manager-name $avnmname --resource-group $rg --query id -o tsv) $(az network manager connect-config show --configuration-name "Mesh-NonProd" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
-    
+## Deploy the security admin configuration
+az network manager post-commit --network-manager-name $avnmname --commit-type "SecurityAdmin" --resource-group $rg --target-locations $region1 $region2 \
+    --configuration-ids $(az network manager security-admin-config show --configuration-name "security-config-1" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
+     
+## Review effect connectivity on each VNet
 az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetA"
 az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetB"
 az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetC"
@@ -105,4 +131,21 @@ az network manager list-effective-connectivity-config --resource-group $rg --vir
 az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetG"
 az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetH"
 
+
+## When done clean up the lab by deleting the resource group and all resources in it
 az group delete -g $rg --no-wait
+
+## Create an X number of security rules
+#!/bin/bash
+for i in {101..200}
+do
+az network manager security-admin-config rule-collection rule create --resource-group $rg --configuration-name "security-config-1" \
+    --network-manager-name $avnmname --rule-collection-name "RuleCollection2" --rule-name RuleCollection2-Rule$i --kind "Custom" \
+    --protocol "Tcp" --access "Allow" --priority $i --direction "Inbound" \
+    --sources address-prefix="192.168.0.0/24" address-prefix-type="IPPrefix" \
+    --sources address-prefix="192.168.1.0/24" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.10.0/24" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.11.0/24" address-prefix-type="IPPrefix" \
+    --dest-port-ranges 22 --output none
+done
+

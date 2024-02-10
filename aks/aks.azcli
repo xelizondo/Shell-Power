@@ -1,0 +1,27 @@
+rg="rg-aks"
+cname="aks1"
+location="eastus"
+
+rg = "rg-aks"
+cname = "aks1"
+location = "eastus"
+
+az group create --name $rg --location eastus
+
+az aks create \
+    --resource-group $rg \
+    --enable-managed-identity \
+    --name $cname \
+    --generate-ssh-keys \
+    --vm-set-type VirtualMachineScaleSets \
+    --load-balancer-sku standard \
+    --node-count 3 \
+    --zones 1 2 3
+
+az aks get-credentials --resource-group $rg --name $cname
+
+
+kubectl get nodes
+
+kubectl describe nodes | grep -e "Name:" -e "topology.kubernetes.io/zone"
+kubectl get nodes -o custom-columns=NAME:'{.metadata.name}',REGION:'{.metadata.labels.topology\.kubernetes\.io/region}',ZONE:'{metadata.labels.topology\.kubernetes\.io/zone}'

@@ -1,0 +1,55 @@
+{
+    "name": "eed215e2-d3d3-4090-8137-24d4a8260170",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "properties": {
+      "displayName": "Deny NSG Rule changes or deletions on NSG rules matching an specified prefix",
+      "description": "This Policy will append a rule to newly deployed NSGs that contain a matching suffix.",
+      "metadata": {
+        "version": "1.0.0",
+        "category": "Network"
+      },
+      "mode": "All",
+      "parameters": {
+        "targetPrefix": {
+          "type": "string",
+          "metadata": {
+            "displayName": "Targeted Prefix",
+            "description": "NSG's containing this prefix will have this policy applied to them."
+          }
+        },
+        "effect": {
+          "type": "String",
+          "metadata": {
+            "displayName": "Effect",
+            "description": "Deny, Audit or Disable the execution of the Policy"
+          },
+          "allowedValues": [
+            "Deny",
+            "Audit",
+            "Disabled"
+          ],
+          "defaultValue": "Deny"
+        }
+      },
+      "policyRule": {
+        "if": {
+          "allOf": [
+            {
+              "field": "type",
+              "equals": "Microsoft.Network/networkSecurityGroups/securityRules"
+            },
+            {
+              "field": "name",
+              "like": "[concat(parameters('targetPrefix'),'*')]"
+            }
+          ]
+        },
+        "then": {
+          "effect": "[parameters('effect')]"
+        }
+      }
+    }
+  }
+
+
+  

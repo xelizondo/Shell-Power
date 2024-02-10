@@ -1,0 +1,8 @@
+Server side
+robocopy C:\Shared\Large \\10.0.0.4\shared$ /mt:1 /v /TS /FP /R:1 /W:5 /log:robocopy.log
+ntttcp -s -m 1,*,10.0.0.4 -t 60
+latte -c -a 10.0.0.4:5005 -i 65
+
+Client side:
+ntttcp -r -m 1,*,10.0.0.4 -t 60
+latte -a 10.0.0.4:5005 -i 65

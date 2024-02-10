@@ -1,0 +1,39 @@
+{
+    "properties": {
+        "displayName": "Enable Private Endpoint Network Policies",
+        "description": "This policy sets the `privateEndpointNetworkPolicies` property to `Enabled` for private endpoints in a subnet.",
+        "mode": "All",
+        "parameters": {},
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Network/privateEndpoints"
+                    },
+                    {
+                        "not": {
+                            "field": "Microsoft.Network/privateEndpoints/privateEndpointNetworkPolicies",
+                            "equals": "Enabled"
+                        }
+                    }
+                ]
+            },
+            "then": {
+                "effect": "modify",
+                "details": {
+                    "roleDefinitionIds": [
+                        "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+                    ],
+                    "operations": [
+                        {
+                            "operation": "addOrReplace",
+                            "field": "Microsoft.Network/privateEndpoints/privateEndpointNetworkPolicies",
+                            "value": "Enabled"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

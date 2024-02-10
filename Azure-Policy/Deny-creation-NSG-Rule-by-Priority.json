@@ -1,0 +1,57 @@
+{
+    "name": "eed215e2-d3d3-4090-8137-24d4a8260170",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "properties": {
+      "displayName": "Deny NSG Rule creation within a range of priority",
+      "description": "This Policy will deny creation of NSG rules in the specific priority range: e.g., 100-200.",
+      "metadata": {
+        "version": "1.0.0",
+        "category": "Network"
+      },
+      "mode": "All",
+      "parameters": {
+        "effect": {
+          "type": "String",
+          "metadata": {
+            "displayName": "Effect",
+            "description": "Deny, Audit or Disable the execution of the Policy"
+          },
+          "allowedValues": [
+            "Deny",
+            "Audit",
+            "Disabled"
+          ],
+          "defaultValue": "Deny"
+        }
+    },
+      "policyRule": {
+        "if": {
+          "allOf": [
+            {
+              "field": "type",
+              "equals": "Microsoft.Network/networkSecurityGroups/securityRules"
+            },
+            {
+              "anyOf": [
+                {
+                    "allOf": [
+                        {
+                            "field": "Microsoft.Network/networkSecurityGroups/securityRules/priority",
+                            "greaterOrEquals": 100
+                        },
+                        {
+                            "field": "Microsoft.Network/networkSecurityGroups/securityRules/priority",
+                            "lessOrEquals": 4005
+                        }
+                    ] 
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "effect": "[parameters('effect')]"
+        }
+      }
+    }
+  }

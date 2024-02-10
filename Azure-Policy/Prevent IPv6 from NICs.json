@@ -1,0 +1,30 @@
+{
+  "properties": {
+    "displayName": "Remove IPv6 option from Network Interfaces",
+    "policyType": "Custom",
+    "mode": "Indexed",
+    "description": "Ensure that Network Interfaces do not have the IPv6 option enabled",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Network"
+    },
+    "parameters": {},
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Network/networkInterfaces"
+          },
+          {
+            "field": "Microsoft.Network/networkInterfaces/ipConfigurations[*].privateIPAddressVersion",
+            "equals": "IPv6"
+          }
+        ]
+      },
+      "then": {
+        "effect": "deny"
+      }
+    }
+  }
+}

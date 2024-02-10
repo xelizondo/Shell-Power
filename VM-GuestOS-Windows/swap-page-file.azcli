@@ -1,0 +1,57 @@
+#Working
+resourceGroup="lab-vwan-mregion"
+virtualMachine="spoke1VM"
+az vm run-command invoke -g $resourceGroup -n $virtualMachine --command-id RunPowerShellScript --scripts '$CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="c:\pagefile.sys";InitialSize = 0; MaximumSize = 0}'
+az vm restart -g $resourceGroup -n $virtualMachine
+az vm run-command invoke -g $resourceGroup -n $virtualMachine --command-id RunPowerShellScript --scripts 'Get-partition | Where-Object {$_.DriveLetter -eq "D"} | Set-Partition -NewDriveLetter Z; $CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="z:\pagefile.sys";InitialSize = 0; MaximumSize = 0}'
+az vm restart -g $resourceGroup -n $virtualMachine
+##############
+
+
+
+# remove page file from drive d
+az vm run-command invoke -g $resourceGroup -n $virtualMachine --command-id RunPowerShellScript --scripts '$CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="c:\pagefile.sys";InitialSize = 0; MaximumSize = 0}; Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\cdrom -Name Start -Value 4 -Type DWord'
+
+# restart server
+az vm restart -g $resourceGroup -n $virtualMachine
+
+# set drive d and it's related disk into offline mode
+az vm run-command invoke -g $resourceGroup -n $virtualMachine --command-id RunPowerShellScript --scripts 'get-disk -Number (Get-Partition -DriveLetter D).disknumber | Set-Disk -IsOffline $true'
+
+# get azure disks and initialize, format and label it (assign a drive letter as well)
+az vm run-command invoke -g $resourceGroup -n $virtualMachine --command-id RunPowerShellScript --scripts 'Get-Disk | Where partitionstyle -eq "raw" | Initialize-Disk -PartitionStyle MBR -PassThru | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -NewFileSystemLabel "disk2" -Confirm:$false'
+
+
+$computersys = Get-WmiObject Win32_ComputerSystem -EnableAllPrivileges;
+$computersys.AutomaticManagedPagefile = $False;
+$computersys.Put();
+$CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"
+$CurrentPageFile.delete()
+Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="c:\pagefile.sys";InitialSize = 0; MaximumSize = 0}
+
+
+
+Get-Disk | Where OperationalStatus -eq "Offline" | Set-Disk -IsOffline $false 
+$Drive = Get-CimInstance -ClassName Win32_Volume -Filter "DriveLetter = 'D:'" 
+$Drive | Set-CimInstance -Property @{DriveLetter ='Z:'}
+$CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"
+$CurrentPageFile.delete()
+Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="z:\pagefile.sys";InitialSize = 0; MaximumSize = 0}
+
+Get-CimInstance -ClassName Win32_Volume -Filter "DriveLetter = 'D:'" | Set-CimInstance -Property @{DriveLetter ='Z:'}
+
+#Working
+$resourceGroup = "lab-vwan-mregion"
+$virtualMachine = "spoke1VM"
+#Remove page file from Temporary Storage drive D and set page file on drive C
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroup -Name $virtualMachine -CommandId 'RunPowerShellScript' -ScriptString '$CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="c:\pagefile.sys";InitialSize = 0; MaximumSize = 0}'
+#Restart the VM to apply the changes
+Restart-AzVM -ResourceGroupName $resourceGroup -name $virtualMachine
+#Change the drive letter of the temporary storage drive D to Z and set page file on drive Z
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroup -Name $virtualMachine -CommandId 'RunPowerShellScript' -ScriptString 'Get-partition | Where-Object {$_.DriveLetter -eq "D"} | Set-Partition -NewDriveLetter Z; $CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="z:\pagefile.sys";InitialSize = 0; MaximumSize = 0}'
+#Restart the VM to apply the changes
+Restart-AzVM -ResourceGroupName $resourceGroup -name $virtualMachine
+################
+
+
+Invoke-AzVMRunCommand -ResourceGroupName $resourceGroup -Name $virtualMachine -CommandId 'RunPowerShellScript' -ScriptString 'Get-partition | Where-Object {$_.DriveLetter -eq "Z"} | Set-Partition -NewDriveLetter D; $CurrentPageFile = Get-WmiObject -Query "select * from Win32_PageFileSetting"; $CurrentPageFile.delete(); Set-WMIInstance -Class Win32_PageFileSetting -Arguments @{name="d:\pagefile.sys";InitialSize = 0; MaximumSize = 0}'
