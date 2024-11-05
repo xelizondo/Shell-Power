@@ -1,0 +1,9 @@
+resources
+| where type == "microsoft.network/publicipaddresses"
+| where sku.name == "Standard"
+| project name, location, resourceGroup, subscriptionId, sku.name, properties.ipAddress
+| order by ['subscriptionId'] asc
+
+resources
+| where type contains 'publicIPAddresses' and isnotempty(properties.ipAddress)
+| project name, id=split(properties.ipConfiguration.id, "providers", 1), ip_address=properties.ipAddress 

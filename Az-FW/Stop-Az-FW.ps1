@@ -28,4 +28,4 @@ $subID = "1b233659-609f-49c0-bf59-f06289eb96e1"
 Set-AzContext -subscriptionId $subID
 $firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
 $firewall.Deallocate()
-$firewall | Set-AzFirewall
+$firewall | Set-AzFirewall -AsJob

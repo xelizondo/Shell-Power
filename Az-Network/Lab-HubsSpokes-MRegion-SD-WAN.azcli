@@ -1,0 +1,669 @@
+#!/bin/bash
+
+# Pre-Requisites
+echo validating pre-requisites
+az extension add --name virtual-wan 
+az extension add --name azure-firewall 
+# or updating vWAN and AzFirewall CLI extensions
+az extension update --name virtual-wan
+az extension update --name azure-firewall 
+
+# Parameters (make changes based on your requirements)
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
+#SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
+rg=lab-mr-hubspoke
+region1=eastus2
+region2=westus2
+region1IPblockSummary="172.16.0.0/21"
+region2IPblockSummary="172.17.0.0/21"
+region1hubIPblock="172.16.0.0/24"
+region2hubIPblock="172.17.0.0/24"
+region1GatewaySubnet="172.16.0.0/27"
+region2GatewaySubnet="172.17.0.0/27"
+region1ARSsubnet="172.16.0.32/27"
+region2ARSsubnet="172.17.0.32/27"
+region1AzFirewallSubnet="172.16.0.64/26"
+region2AzFirewallSubnet="172.17.0.64/26"
+region1HubServersSubnet="172.16.0.248/29"
+region2HubServersSubnet="172.17.0.248/29"
+region1TransitSubnet="172.20.0.0/24"
+region1TransitGatewaySubnet="172.20.0.0/27"
+region1TransitARSsubnet="172.20.0.32/27"
+region1TransitNVAExtSubnet="172.20.0.64/28"
+region1TransitNVAIntSubnet="172.20.0.144/28"
+NVAtransit="NVA"
+NVAasn="65050"
+NVAip="172.20.0.148"
+ARStransitIP="172.20.0.36"
+region1Spokes=3
+region2Spokes=3
+region1SpokeVMs=1
+region2SpokeVMs=1
+hub1name=vnet-hub1-$region1
+hub2name=vnet-hub2-$region2
+username=az-admin
+vmsize=Standard_B2ms
+firewallsku=Standard
+password="LOCAL$$admin2024"
+
+#Set subscription context
+az account set --subscription $SubscriptionID
+
+#Variables
+#mypip="162.207.71.133"
+#mypip="40.114.90.46"
+mypip=$(curl -4 ifconfig.io -s)
+
+# create rg
+az group create -n $rg -l $region1 --output none
+
+echo Creating both hub vNets...
+# create both hub vNets
+az network vnet create --address-prefixes $region1hubIPblock -n $hub1name -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes $region1GatewaySubnet --output none --no-wait
+az network vnet create --address-prefixes $region2hubIPblock -n $hub2name -g $rg -l $region2 --subnet-name GatewaySubnet --subnet-prefixes $region2GatewaySubnet --output none --no-wait    
+
+echo Creating Transit vNet...
+# create Transit vNet where SD-WAN will be deployed
+az network vnet create --address-prefixes $region1TransitSubnet -n vnet-transit -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes $region1TransitGatewaySubnet --output none
+az network vnet subnet create -g $rg --vnet-name vnet-transit -n RouteServerSubnet --address-prefixes $region1TransitARSsubnet --output none
+az network vnet subnet create -g $rg --vnet-name vnet-transit -n NVA-Untrusted --address-prefixes $region1TransitNVAExtSubnet --output none
+az network vnet subnet create -g $rg --vnet-name vnet-transit -n NVA-Trusted --address-prefixes $region1TransitNVAIntSubnet --output none
+
+#create an Azure Route Server in vnet-transit
+arssubnetId=$(az network vnet subnet show --name 'RouteServerSubnet' -g $rg --vnet-name vnet-transit --query id -o tsv)
+az network public-ip create -g $rg --name pip-ars-transit --sku Standard --version 'IPv4' --output none
+az network routeserver create -n ars-transit -g $rg -l $region1 --hosted-subnet $arssubnetId --public-ip-address pip-ars-transit --output none
+az network routeserver peering create -g $rg --name $NVAtransit --peer-ip $NVApeerip --peer-asn $NVAasn --routeserver ars-transit --output none
+az network routeserver update --name ars-transit -g $rg --allow-b2b-traffic yes --output none
+
+
+#create an Azure Route Server in hub1 region 2
+arsregion2subnetId=$(az network vnet subnet show --name 'RouteServerSubnet' -g $rg --vnet-name $hub2name --query id -o tsv)
+az network public-ip create -g $rg -l $region2 --name pip-ars-$region2 --sku Standard --version 'IPv4' --output none
+az network routeserver create -n ars-$region2 -g $rg -l $region2 --hosted-subnet $arsregion2subnetId --public-ip-address pip-ars-$region2 --output none
+az network routeserver peering create -g $rg --name $NVAtransit --peer-ip $NVAip --peer-asn $NVAasn --routeserver ars-$region2 --output none
+az network routeserver update --name ars-$region2 -g $rg --allow-b2b-traffic yes --output none
+az network routeserver peering list-learned-routes -g $rg --routeserver ars-$region2 -n $NVAtransit
+
+
+# Create subnets for ARS on each region hub VNets
+echo creating subnets for ARS on each region hub VNets ...
+az network vnet subnet create -g $rg --vnet-name $hub1name -n RouteServerSubnet --address-prefixes $region1ARSsubnet --output none --no-wait
+az network vnet subnet create -g $rg --vnet-name $hub2name -n RouteServerSubnet --address-prefixes $region2ARSsubnet --output none --no-wait
+
+# Create subnets for Az Firewalls on each region hub VNets
+echo creating subnets for Az Firewalls on each region hub VNets ...
+az network vnet subnet create -g $rg --vnet-name $hub1name -n AzureFirewallSubnet --address-prefixes $region1AzFirewallSubnet --output none --no-wait
+az network vnet subnet create -g $rg --vnet-name $hub2name -n AzureFirewallSubnet --address-prefixes $region2AzFirewallSubnet --output none --no-wait
+
+# Create subnets for Server on each region hub VNets
+echo creating subnets for Az Firewalls on each region hub VNets ...
+az network vnet subnet create -g $rg --vnet-name $hub1name -n snet-Hub1-$region1-Servers --address-prefixes $region1HubServersSubnet --output none --no-wait
+az network vnet subnet create -g $rg --vnet-name $hub2name -n snet-Hub2-$region2-Servers --address-prefixes $region2HubServersSubnet --output none --no-wait
+
+
+echo Creating spoke VNETs...
+# Create Spoke virtual networks Region1
+for ((i=1; i<=region1Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region1
+echo "Creating virtual network $vnet_name..."
+az network vnet create --resource-group $rg -l $region1 --name $vnet_name --address-prefix 172.16.$i.0/24 --subnet-name snet-$i --subnet-prefix 172.16.$i.0/24 --output none 
+done
+
+# Create Spoke virtual networks Region2
+for ((i=1; i<=region2Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region2
+echo "Creating virtual network $vnet_name..."
+az network vnet create --resource-group $rg -l $region2 --name $vnet_name --address-prefix 172.17.$i.0/24 --subnet-name snet-$i --subnet-prefix 172.17.$i.0/24 --output none 
+done
+
+
+# Create VNet peering from spokes to hub vNet in $region1 
+for ((i=1; i<=region1Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region1
+echo "Creating virtual network peerings in $region1 for $hub1name to spoke vnets..."
+az network vnet peering create -g $rg -n $hub1name-to-$vnet_name --vnet-name $hub1name --remote-vnet $vnet_name --allow-vnet-access yes --allow-forwarded-traffic yes --output none #--use-remote-gateways yes
+az network vnet peering create -g $rg -n $vnet_name-to-$hub1name --vnet-name $vnet_name --remote-vnet $hub1name --allow-vnet-access yes --allow-forwarded-traffic yes --output none #--use-remote-gateways yes
+done
+
+# Create VNet peering from spokes to hub vNet in $region2 
+for ((i=1; i<=region2Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region2
+echo "Creating virtual network peerings in $region2 for $hub1name to spoke vnets..."
+az network vnet peering create -g $rg -n $hub2name-to-$vnet_name --vnet-name $hub2name --remote-vnet $vnet_name --allow-vnet-access yes --allow-forwarded-traffic yes --output none #--use-remote-gateways yes
+az network vnet peering create -g $rg -n $vnet_name-to-$hub2name --vnet-name $vnet_name --remote-vnet $hub2name --allow-vnet-access yes --allow-forwarded-traffic yes --output none #--use-remote-gateways yes
+done
+
+# Create global VNet peering between Hub1 Region1 and transit VNet
+az network vnet peering create -g $rg -n $hub1name-to-vNetTransit --vnet-name $hub1name --remote-vnet vnet-transit --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+az network vnet peering create -g $rg -n vNetTransit-to-$hub1name --vnet-name vnet-transit --remote-vnet $hub1name --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+
+# Create global VNet peering between Hub2 Region2 and transit VNet
+az network vnet peering create -g $rg -n $hub2name-to-vNetTransit --vnet-name $hub2name --remote-vnet vnet-transit --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+az network vnet peering create -g $rg -n vNetTransit-to-$hub2name --vnet-name vnet-transit --remote-vnet $hub2name --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+
+:<<'COMMENT'
+# Create global VNet peering between hub vNets
+az network vnet peering create -g $rg -n $hub1name-to-$hub2name --vnet-name $hub1name --remote-vnet $hub2name --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+az network vnet peering create -g $rg -n $hub2name-to-$hub1name --vnet-name $hub2name --remote-vnet $hub1name --allow-vnet-access yes --allow-forwarded-traffic yes --output none --allow-gateway-transit true
+COMMENT
+
+echo Creating Azure Firewall Policy for Egress Firewall on $region1
+#Create firewall rules
+fwpolicyname=$hub1name-fwpolicy #Firewall Policy Name
+az network firewall policy create --name $fwpolicyname --resource-group $rg --location $region1 --sku $firewallsku --enable-dns-proxy false --output none --only-show-errors
+az network firewall policy rule-collection-group create --name NetworkRuleCollectionGroup --priority 200 --policy-name $fwpolicyname --resource-group $rg --output none --only-show-errors
+#Adding any-to-any firewall rule
+az network firewall policy rule-collection-group collection add-filter-collection \
+ --resource-group $rg \
+ --policy-name $fwpolicyname \
+ --name GenericCollection \
+ --rcg-name NetworkRuleCollectionGroup \
+ --rule-type NetworkRule \
+ --rule-name AnytoAny \
+ --action Allow \
+ --ip-protocols "Any" \
+ --source-addresses "*" \
+ --destination-addresses  "*" \
+ --destination-ports "*" \
+ --collection-priority 100 \
+ --output none
+
+echo Deploying Azure Firewall inside VNet $region1...
+fwpolid=$(az network firewall policy show --resource-group $rg --name $fwpolicyname --query id --output tsv)
+az network firewall create -g $rg -n $hub1name-azfw --sku AZFW_VNet --vnet-name $hub1name --tier $firewallsku --public-ip-count 1 --firewall-policy $hub1name-fwpolicy --location $region1 --output none
+az network public-ip create --name $hub1name-azfw-pip --resource-group $rg --location $region1 --allocation-method static --sku $firewallsku --output none
+az network firewall ip-config create --firewall-name $hub1name-azfw --name $hub1name-azfw-config --public-ip-address $hub1name-azfw-pip --resource-group $rg --vnet-name $hub1name --output none
+az network firewall update --name $hub1name-azfw --resource-group $rg --output none
+
+
+echo Creating Azure Firewall Policy for Firewall on $region2
+#Create firewall rules
+fwpolicyname=$hub2name-fwpolicy #Firewall Policy Name
+az network firewall policy create --name $fwpolicyname --resource-group $rg --location $region2 --sku $firewallsku --enable-dns-proxy false --output none --only-show-errors
+az network firewall policy rule-collection-group create --name NetworkRuleCollectionGroup --priority 200 --policy-name $fwpolicyname --resource-group $rg --output none --only-show-errors
+#Adding any-to-any firewall rule
+az network firewall policy rule-collection-group collection add-filter-collection \
+ --resource-group $rg \
+ --policy-name $fwpolicyname \
+ --name GenericCollection \
+ --rcg-name NetworkRuleCollectionGroup \
+ --rule-type NetworkRule \
+ --rule-name AnytoAny \
+ --action Allow \
+ --ip-protocols "Any" \
+ --source-addresses "*" \
+ --destination-addresses  "*" \
+ --destination-ports "*" \
+ --collection-priority 100 \
+ --output none
+
+echo Deploying Azure Firewall inside Hub $region2...
+fwpolid=$(az network firewall policy show --resource-group $rg --name $fwpolicyname --query id --output tsv)
+az network firewall create -g $rg -n $hub2name-azfw --sku AZFW_VNet --vnet-name $hub2name --tier $firewallsku --public-ip-count 1 --firewall-policy $hub2name-fwpolicy --location $region2 --output none
+az network public-ip create --name $hub2name-azfw-pip --resource-group $rg --location $region2 --allocation-method static --sku $firewallsku --output none
+az network firewall ip-config create --firewall-name $hub2name-azfw --name $hub2name-azfw-config --public-ip-address $hub2name-azfw-pip --resource-group $rg --vnet-name $hub2name --output none
+az network firewall update --name $hub2name-azfw --resource-group $rg --output none
+
+
+echo Enabling $hub1name Azure Firewall diagnostics...
+## Log Analytics workspace name. 
+Workspacename=$hub1name-$region1-Logs
+
+#Creating Log Analytics Workspaces
+az monitor log-analytics workspace create -g $rg --workspace-name $Workspacename --location $region1 --output none
+
+#EnablingAzure Firewall diagnostics
+#az monitor diagnostic-settings show -n toLogAnalytics -g $rg --resource $(az network firewall show --name $hub1name-azfw --resource-group $rg --query id -o tsv)
+az monitor diagnostic-settings create -n 'toLogAnalytics' \
+--resource $(az network firewall show --name $hub1name-azfw --resource-group $rg --query id -o tsv) \
+--workspace $(az monitor log-analytics workspace show -g $rg --workspace-name $Workspacename --query id -o tsv) \
+--logs '[{"category":"AzureFirewallApplicationRule","Enabled":true}, {"category":"AzureFirewallNetworkRule","Enabled":true}, {"category":"AzureFirewallDnsProxy","Enabled":true}]' \
+--metrics '[{"category": "AllMetrics","enabled": true}]' \
+--output none
+
+
+echo Enabling $hub2name Azure Firewall diagnostics...
+## Log Analytics workspace name. 
+Workspacename=$hub2name-$region2-Logs
+
+#Creating Log Analytics Workspaces
+az monitor log-analytics workspace create -g $rg --workspace-name $Workspacename --location $region2 --output none
+
+#EnablingAzure Firewall diagnostics
+#az monitor diagnostic-settings show -n toLogAnalytics -g $rg --resource $(az network firewall show --name $hub2name-azfw --resource-group $rg --query id -o tsv)
+az monitor diagnostic-settings create -n 'toLogAnalytics' \
+--resource $(az network firewall show --name $hub2name-azfw --resource-group $rg --query id -o tsv) \
+--workspace $(az monitor log-analytics workspace show -g $rg --workspace-name $Workspacename --query id -o tsv) \
+--logs '[{"category":"allLogs","Enabled":true}]' \
+--metrics '[{"category": "AllMetrics","enabled": true}]' \
+--output none
+
+
+#Create custom route tables for Hub Az FW in Region 1 to Spoke VNets in Region 2
+az network route-table create --name RT-to-$region2  --resource-group $rg --location $region1 --disable-bgp-route-propagation false --output none
+az network route-table route create --resource-group $rg --name Default-to-Internet --route-table-name RT-to-$region2 \
+--address-prefix 0.0.0.0/0 \
+--next-hop-type Internet \
+--output none
+az network route-table route create --resource-group $rg --name Summary-to-$region2-spokes --route-table-name RT-to-$region2 \
+--address-prefix $region2IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub2name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+## Associating AzureFirewallSubnet in Region1 to RT-to-$region2-Spokes
+az network vnet subnet update -n AzureFirewallSubnet -g $rg --vnet-name $hub1name --route-table RT-to-$region2 --output none
+
+#Create custom route tables for for Hub Az FW in Region 2 to Spoke VNets in Region 1
+az network route-table create --name RT-to-$region1  --resource-group $rg --location $region2 --disable-bgp-route-propagation false --output none
+az network route-table route create --resource-group $rg --name Default-to-Internet --route-table-name RT-to-$region1 \
+--address-prefix 0.0.0.0/0 \
+--next-hop-type Internet \
+--output none
+az network route-table route create --resource-group $rg --name Summary-to-$region1-spokes --route-table-name RT-to-$region1 \
+--address-prefix $region1IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub1name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+## Associating AzureFirewallSubnet in Region2 to RT-to-$region1-Spokes
+az network vnet subnet update -n AzureFirewallSubnet -g $rg --vnet-name $hub2name --route-table RT-to-$region1 -o none
+
+#Create custom route tables for Spoke VNets in Region 1
+az network route-table create --name RT-to-$hub1name-AzFw  --resource-group $rg --location $region1 --disable-bgp-route-propagation true --output none
+az network route-table route create --resource-group $rg --name Summary-to-$region1-spokes --route-table-name RT-to-$hub1name-AzFW \
+--address-prefix $region1IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub1name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+az network route-table route create --resource-group $rg --name Summary-to-$region2-spokes --route-table-name RT-to-$hub1name-AzFW \
+--address-prefix $region2IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub1name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+az network route-table route create --resource-group $rg --name Default-Internet-via-$hub1name-AzFW --route-table-name RT-to-$hub1name-AzFW \
+--address-prefix 0.0.0.0/0 \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub1name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+## Associating Spoke VNets in Region 1 to RT-to-$hub1name-AzFW 
+for ((i=1; i<=region1Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region1
+echo Associating Spoke VNets in Region 1 to RT-to-$hub2name-AzFW
+az network vnet subnet update -n snet-$i -g $rg --vnet-name $vnet_name --route-table RT-to-$hub1name-AzFw --output none
+done
+
+
+#Create custom route tables for Spoke VNets in Region 2
+az network route-table create --name RT-to-$hub2name-AzFw  --resource-group $rg --location $region2 --disable-bgp-route-propagation false --output none
+az network route-table route create --resource-group $rg --name Summary-to-$region1-spokes --route-table-name RT-to-$hub2name-AzFW \
+--address-prefix $region1IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub2name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+az network route-table route create --resource-group $rg --name Summary-to-$region2-spokes --route-table-name RT-to-$hub2name-AzFW \
+--address-prefix $region2IPblockSummary \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub2name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+az network route-table route create --resource-group $rg --name Default-Internet-via-$hub2name-AzFW --route-table-name RT-to-$hub2name-AzFW \
+--address-prefix 0.0.0.0/0 \
+--next-hop-type VirtualAppliance \
+--next-hop-ip-address $(az network firewall show --name $hub2name-azfw --resource-group $rg --query 'ipConfigurations[0].privateIPAddress' -o tsv) \
+--output none
+
+## Associating Spoke VNets in Region 2 to RT-to-$hub2name-AzFW 
+for ((i=1; i<=region2Spokes; i++))
+do
+vnet_name=vnet-spk$i-$region2
+echo Associating Spoke VNets in Region 2 to RT-to-$hub2name-AzFW ...
+az network vnet subnet update -n snet-$i -g $rg --vnet-name $vnet_name --route-table RT-to-$hub2name-AzFw --output none
+done
+
+
+
+echo Creating NSGs for both regions...
+#Update NSGs:
+az network nsg create --resource-group $rg --name default-nsg-$hub1name-$region1 --location $region1 -o none
+az network nsg create --resource-group $rg --name default-nsg-$hub2name-$region2 --location $region2 -o none
+
+# Add my home public IP to NSG for SSH acess
+az network nsg rule create -g $rg --nsg-name default-nsg-$hub1name-$region1 -n 'default-allow-ssh' --direction Inbound --priority 100 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow inbound SSH" --output none
+az network nsg rule create -g $rg --nsg-name default-nsg-$hub2name-$region2 -n 'default-allow-ssh' --direction Inbound --priority 100 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow inbound SSH" --output none
+
+# Add my home public IP to NSG for RDP acess
+az network nsg rule create -g $rg --nsg-name default-nsg-$hub1name-$region1 -n 'default-allow-rdp' --direction Inbound --priority 101 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow inbound RDP" --output none
+az network nsg rule create -g $rg --nsg-name default-nsg-$hub2name-$region2 -n 'default-allow-rdp' --direction Inbound --priority 101 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow inbound RDP" --output none
+
+# Associated NSG to the VNET subnets (Spokes and Branches in both regions)
+az network vnet subnet update --id $(az network vnet list -g $rg --query '[?location==`'$region1'`].{id:subnets[0].id}' -o tsv) --network-security-group default-nsg-$hub1name-$region1 -o none
+az network vnet subnet update --id $(az network vnet list -g $rg --query '[?location==`'$region2'`].{id:subnets[0].id}' -o tsv) --network-security-group default-nsg-$hub2name-$region2 -o none
+
+# create a VM in each connected spoke in region1
+echo Creating Spoke VMs...
+for ((i=1; i<=region1SpokeVMs; i++))
+do
+  vnet_name=vnet-spk$i-$region1
+  snet="snet-$i"
+  echo "Creating virtual machine spk$i-VM-$region1...on $vnet_name"
+  az vm create -n spk$i-VM-$region1 -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet $snet --vnet-name $vnet_name --admin-username $username --admin-password $password --no-wait --nsg ""
+  az vm auto-shutdown -g $rg -name spk$i-VM-$region1 --time 0400 --email-notification "Disabled" --no-wait
+done
+
+
+az vm create -n VM-$hub2name -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region2 --subnet snet-Hub2-$region2-Servers --vnet-name $hub2name --admin-username $username --admin-password $password --no-wait --nsg ""
+
+
+# create a VM in each connected spoke in region2
+echo Creating Spoke VMs...
+for ((i=1; i<=region2SpokeVMs; i++))
+do
+  vnet_name=vnet-spk$i-$region2
+  snet="snet-$i"
+  echo "Creating virtual machine spk$i-VM-$region1...on $vnet_name"
+  az vm create -n spk$i-VM-$region2 -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region2 --subnet $snet --vnet-name $vnet_name --admin-username $username --admin-password $password --no-wait --nsg ""
+  az vm auto-shutdown -g $rg -name spk$i-VM-$region2 --time 0400 --email-notification "Disabled" --no-wait
+done
+
+
+#Enable boot diagnostics for all VMs in the resource group (Serial console)
+#Create Storage Account (boot diagnostics + serial console)
+let "randomIdentifier1=$RANDOM*$RANDOM"
+az storage account create -n sc$randomIdentifier1 -g $rg -l $region1 --sku Standard_LRS -o none
+let "randomIdentifier2=$RANDOM*$RANDOM"
+az storage account create -n sc$randomIdentifier2 -g $rg -l $region2 --sku Standard_LRS -o none
+#Enable boot diagnostics
+stguri1=$(az storage account show -n sc$randomIdentifier1 -g $rg --query primaryEndpoints.blob -o tsv)
+stguri2=$(az storage account show -n sc$randomIdentifier2 -g $rg --query primaryEndpoints.blob -o tsv)
+az vm boot-diagnostics enable --storage $stguri1 --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
+az vm boot-diagnostics enable --storage $stguri2 --ids $(az vm list -g $rg --query '[?location==`'$region2'`].{id:id}' -o tsv) -o none
+### Install tools for networking connectivity validation such as traceroute, tcptraceroute, iperf and others (check link below for more details) 
+nettoolsuri="https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh"
+for vm in `az vm list -g $rg --query "[?storageProfile.imageReference.offer=='UbuntuServer'].name" -o tsv`
+do
+ az vm extension set \
+ --resource-group $rg \
+ --vm-name $vm \
+ --name customScript \
+ --publisher Microsoft.Azure.Extensions \
+ --protected-settings "{\"fileUris\": [\"$nettoolsuri\"],\"commandToExecute\": \"./nettools.sh\"}" \
+ --no-wait
+done
+
+echo Creating branches VNETs...
+# create location1 branch virtual network
+az network vnet create --address-prefixes 10.100.0.0/16 -n branch1-$region1 -g $rg -l $region1 --subnet-name main --subnet-prefixes 10.100.0.0/24 --output none
+az network vnet subnet create -g $rg --vnet-name branch1-$region1 -n GatewaySubnet --address-prefixes 10.100.100.0/26 --output none
+# create location2 branch virtual network
+az network vnet create --address-prefixes 10.200.0.0/16 -n branch1-$region2 -g $rg -l $region2 --subnet-name main --subnet-prefixes 10.200.0.0/24 --output none
+az network vnet subnet create -g $rg --vnet-name branch1-$region2 -n GatewaySubnet --address-prefixes 10.200.100.0/26 --output none
+
+echo Creating VPN Gateways in both branches...
+# create pips for VPN GW's in each branch
+az network public-ip create -n branch1-$region1-vpngw-pip -g $rg --location $region1 --sku Basic --output none
+az network public-ip create -n branch1-$region2-vpngw-pip -g $rg --location $region2 --sku Basic --output none
+# create VPN gateways
+az network vnet-gateway create -n branch1-$region1-vpngw --public-ip-addresses branch1-$region1-vpngw-pip -g $rg --vnet branch1-$region1 --asn 65010 --gateway-type Vpn -l $region1 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait 
+az network vnet-gateway create -n branch1-$region2-vpngw --public-ip-addresses branch1-$region2-vpngw-pip -g $rg --vnet branch1-$region2 --asn 65009 --gateway-type Vpn -l $region2 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait
+
+echo Creating VMs in both branches...
+# create a VM in each branch spoke Win2019Datacenter
+
+az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
+az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
+
+#az vm create -n branch1VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name branch1 --admin-username $username --admin-password $password --nsg "" --no-wait
+#az vm create -n branch2VM  -g $rg --image ubuntults --public-ip-sku Standard --size $vmsize -l $region2 --subnet main --vnet-name branch2 --admin-username $username --admin-password $password --nsg "" --no-wait
+
+
+echoecho Creating VPN Gateways in both hubs...
+# create pips for VPN GW's in each hub
+az network public-ip create -n $hub1name-vpngw-pip -g $rg --location $region1 --sku Basic --output none
+az network public-ip create -n $hub2name-vpngw-pip -g $rg --location $region2 --sku Basic --output none
+
+# create VPN gateways
+az network vnet-gateway create -n $hub1name-vpngw --public-ip-addresses $hub1name-vpngw-pip -g $rg --vnet $hub1name --asn 65009 --gateway-type Vpn -l $region1 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait 
+az network vnet-gateway create -n $hub2name-vpngw --public-ip-addresses $hub2name-vpngw-pip -g $rg --vnet $hub2name --asn 65010 --gateway-type Vpn -l $region2 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait
+
+echo Validating Branches VPN Gateways provisioning...
+#Branches VPN Gateways provisioning status
+prState=$(az network vnet-gateway show -g $rg -n branch1-vpngw --query provisioningState -o tsv)
+if [[ $prState == 'Failed' ]];
+then
+    echo VPN Gateway is in fail state. Deleting and rebuilding.
+    az network vnet-gateway delete -n branch1-vpngw -g $rg
+    az network vnet-gateway create -n branch1-vpngw --public-ip-addresses branch1-vpngw-pip -g $rg --vnet branch1 --asn 65010 --gateway-type Vpn -l $region1 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait 
+    sleep 5
+else
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vnet-gateway show -g $rg -n branch1-vpngw --query provisioningState -o tsv)
+        echo "branch1-vpngw provisioningState="$prState
+        sleep 5
+    done
+fi
+
+prState=$(az network vnet-gateway show -g $rg -n branch2-vpngw --query provisioningState -o tsv)
+if [[ $prState == 'Failed' ]];
+then
+    echo VPN Gateway is in fail state. Deleting and rebuilding.
+    az network vnet-gateway delete -n branch2-vpngw -g $rg
+    az network vnet-gateway create -n branch2-vpngw --public-ip-addresses branch2-vpngw-pip -g $rg --vnet branch2 --asn 65009 --gateway-type Vpn -l $region2 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait 
+    sleep 5
+else
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vnet-gateway show -g $rg -n branch2-vpngw --query provisioningState -o tsv)
+        echo "branch2-vpngw provisioningState="$prState
+        sleep 5
+    done
+fi
+
+echo Validating vHubs VPN Gateways provisioning...
+#Hubs VPN Gateway Status
+prState=$(az network vpn-gateway show -g $rg -n $hub1name-vpngw --query provisioningState -o tsv)
+if [[ $prState == 'Failed' ]];
+then
+    echo VPN Gateway is in fail state. Deleting and rebuilding.
+    az network vpn-gateway delete -n $hub1name-vpngw -g $rg
+    az network vpn-gateway create -n $hub1name-vpngw -g $rg --location $region1 --vhub $hub1name --no-wait
+    sleep 5
+else
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vpn-gateway show -g $rg -n $hub1name-vpngw --query provisioningState -o tsv)
+        echo $hub1name-vpngw "provisioningState="$prState
+        sleep 5
+    done
+fi
+
+prState=$(az network vpn-gateway show -g $rg -n $hub2name-vpngw --query provisioningState -o tsv)
+if [[ $prState == 'Failed' ]];
+then
+    echo VPN Gateway is in fail state. Deleting and rebuilding.
+    az network vpn-gateway delete -n $hub2name-vpngw -g $rg
+    az network vpn-gateway create -n $hub2name-vpngw -g $rg --location $region2 --vhub $hub2name --no-wait
+    sleep 5
+else
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vpn-gateway show -g $rg -n $hub2name-vpngw --query provisioningState -o tsv)
+        echo $hub2name-vpngw "provisioningState="$prState
+        sleep 5
+    done
+fi
+
+echo Building VPN connections from VPN Gateways to the respective Branches...
+# get bgp peering and public ip addresses of VPN GW and VWAN to set up connection
+# Branch 1 and Hub1 VPN Gateway variables
+bgp1=$(az network vnet-gateway show -n branch1-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].defaultBgpIpAddresses[0]' -o tsv)
+pip1=$(az network vnet-gateway show -n branch1-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].tunnelIpAddresses[0]' -o tsv)
+vwanh1gwbgp1=$(az network vpn-gateway show -n $hub1name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].defaultBgpIpAddresses[0]' -o tsv)
+vwanh1gwpip1=$(az network vpn-gateway show -n $hub1name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].tunnelIpAddresses[0]' -o tsv)
+vwanh1gwbgp2=$(az network vpn-gateway show -n $hub1name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[1].defaultBgpIpAddresses[0]' -o tsv)
+vwanh1gwpip2=$(az network vpn-gateway show -n $hub1name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[1].tunnelIpAddresses[0]' -o tsv)
+
+# Branch 2 and Hub2 VPN Gateway variables
+bgp2=$(az network vnet-gateway show -n branch2-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].defaultBgpIpAddresses[0]' -o tsv)
+pip2=$(az network vnet-gateway show -n branch2-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].tunnelIpAddresses[0]' -o tsv)
+vwanh2gwbgp1=$(az network vpn-gateway show -n $hub2name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].defaultBgpIpAddresses[0]' -o tsv)
+vwanh2gwpip1=$(az network vpn-gateway show -n $hub2name-vpngw  -g $rg --query 'bgpSettings.bgpPeeringAddresses[0].tunnelIpAddresses[0]' -o tsv)
+vwanh2gwbgp2=$(az network vpn-gateway show -n $hub2name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[1].defaultBgpIpAddresses[0]' -o tsv)
+vwanh2gwpip2=$(az network vpn-gateway show -n $hub2name-vpngw -g $rg --query 'bgpSettings.bgpPeeringAddresses[1].tunnelIpAddresses[0]' -o tsv)
+
+# create virtual wan vpn site
+az network vpn-site create --ip-address $pip1 -n site-branch1 -g $rg --asn 65010 --bgp-peering-address $bgp1 -l $region1 --virtual-wan $vwanname --device-model 'Azure' --device-vendor 'Microsoft' --link-speed '50' --with-link true --output none
+az network vpn-site create --ip-address $pip2 -n site-branch2 -g $rg --asn 65009 --bgp-peering-address $bgp2 -l $region2 --virtual-wan $vwanname --device-model 'Azure' --device-vendor 'Microsoft' --link-speed '50' --with-link true --output none
+
+# create virtual wan vpn connection
+az network vpn-gateway connection create --gateway-name $hub1name-vpngw -n site-branch1-conn -g $rg --enable-bgp true --remote-vpn-site site-branch1 --internet-security --shared-key 'abc123' --output none
+az network vpn-gateway connection create --gateway-name $hub2name-vpngw -n site-branch2-conn -g $rg --enable-bgp true --remote-vpn-site site-branch2 --internet-security --shared-key 'abc123' --output none
+
+# create connection from vpn gw to local gateway and watch for connection succeeded
+az network local-gateway create -g $rg -n lng-$hub1name-gw1 --gateway-ip-address $vwanh1gwpip1 --asn 65515 --bgp-peering-address $vwanh1gwbgp1 -l $region1 --output none
+az network vpn-connection create -n branch1-to-$hub1name-gw1 -g $rg -l $region1 --vnet-gateway1 branch1-vpngw --local-gateway2 lng-$hub1name-gw1 --enable-bgp --shared-key 'abc123' --output none
+
+az network local-gateway create -g $rg -n lng-$hub1name-gw2 --gateway-ip-address $vwanh1gwpip2 --asn 65515 --bgp-peering-address $vwanh1gwbgp2 -l $region1 --output none
+az network vpn-connection create -n branch1-to-$hub1name-gw2 -g $rg -l $region1 --vnet-gateway1 branch1-vpngw --local-gateway2 lng-$hub1name-gw2 --enable-bgp --shared-key 'abc123' --output none
+
+az network local-gateway create -g $rg -n lng-$hub2name-gw1 --gateway-ip-address $vwanh2gwpip1 --asn 65515 --bgp-peering-address $vwanh2gwbgp1 -l $region2 --output none
+az network vpn-connection create -n branch2-to-$hub2name-gw1 -g $rg -l $region2 --vnet-gateway1 branch2-vpngw --local-gateway2 lng-$hub2name-gw1 --enable-bgp --shared-key 'abc123' --output none
+
+az network local-gateway create -g $rg -n lng-$hub2name-gw2 --gateway-ip-address $vwanh2gwpip2 --asn 65515 --bgp-peering-address $vwanh2gwbgp2 -l $region2 --output none
+az network vpn-connection create -n branch2-to-$hub2name-gw2 -g $rg -l $region2 --vnet-gateway1 branch2-vpngw --local-gateway2 lng-$hub2name-gw2 --enable-bgp --shared-key 'abc123' --output none
+
+
+###################################################################### 
+
+
+##PowerShell Below
+# //  Start FW in vWAN
+
+$vhubname = "sechub1-eus"
+$firewallRG = "lab-vwan-intra"
+$firewallName = "sechub1-eus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0"  
+Set-AzContext -subscriptionId $subID
+$virtualhub = get-azvirtualhub -ResourceGroupName $firewallRG -name $vhubname
+$firewall = Get-AzFirewall -Name $firewallName -ResourceGroupName $firewallRG
+$firewall.Allocate($virtualhub.Id)
+$firewall | Set-AzFirewall -AsJob
+
+# //  Start FW in vWAN
+
+$vhubname = "sechub2-eus"
+$firewallRG = "lab-vwan-intra"
+$firewallName = "sechub2-eus2-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0"
+Set-AzContext -subscriptionId $subID
+$virtualhub = get-azvirtualhub -ResourceGroupName $firewallRG -name $vhubname
+$firewall = Get-AzFirewall -Name $firewallName -ResourceGroupName $firewallRG
+$firewall.Allocate($virtualhub.Id)
+$firewall | Set-AzFirewall -AsJob
+
+
+
+
+
+# //  STOP FW in vWAN
+$vhubname = "sechub1-eus"
+$firewallRG = "lab-vwan-intra"
+$firewallName = "sechub1-eus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0"  
+Set-AzContext -subscriptionId $subID
+$firewall = Get-AzFirewall -Name $firewallName -ResourceGroupName $firewallRG
+$firewall.Deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+# //  STOP FW in vWAN
+$vhubname = "sechub2-eus"
+$firewallRG = "lab-vwan-intra"
+$firewallName = "sechub2-eus2-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0"  
+Set-AzContext -subscriptionId $subID
+$firewall = Get-AzFirewall -Name $firewallName -ResourceGroupName $firewallRG
+$firewall.Deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+
+
+#Start Std FW
+$firewallRG = "lab-vwan-intra"
+$firewallName = "egress-eastus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Allocate Firewall
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "vnet-egress-eastus"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "egress-eastus-azfw-pip"
+$firewall.Allocate($vnet, $pip)
+$firewall | Set-AzFirewall -AsJob
+
+#Start Std FW
+$firewallRG = "lab-vwan-intra"
+$firewallName = "egress-westus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Allocate Firewall
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "vnet-egress-westus"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "egress-westus-azfw-pip"
+$firewall.Allocate($vnet, $pip)
+$firewall | Set-AzFirewall -AsJob
+
+
+#Start Std FW
+$firewallRG = "lab-hubspoke-mr"
+$firewallName = "hub1-eastus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Allocate Firewall
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "hub1-eastus"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "hub1-eastus-azfw-pip"
+$firewall.Allocate($vnet, $pip)
+$firewall | Set-AzFirewall -AsJob
+
+#Start Std FW
+$firewallRG = "lab-hubspoke-mr"
+$firewallName = "hub2-westus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Allocate Firewall
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "hub2-westus"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "hub2-westus-azfw-pip"
+$firewall.Allocate($vnet, $pip)
+$firewall | Set-AzFirewall -AsJob
+
+# STOP Std FW
+$firewallRG = "lab-vwan-intra"
+$firewallName = "egress-eastus-azfw"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Deallocate Firewall
+$firewall.deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+
+# STOP Std FW
+$firewallRG = "lab-vwan-intra"
+$firewallRG = "lab-hubspoke-mr"
+$subID = "7964825c-fb12-4906-8cb9-a072355dc0f0" 
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG
+# // Deallocate Firewall
+$firewall.deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+
+az group delete -g $rg --no-wait

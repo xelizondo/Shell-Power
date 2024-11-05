@@ -1,0 +1,134 @@
+ii=0
+for ((i=0; i<=240; i+=16))
+do
+  ii=$((ii+1))
+  vnet_name=spk$ii-vnet
+  echo $vnet_name
+  #az network vnet create --resource-group $rg -l $region1 --name $vnet_name --address-prefix 10.0.$i.0/28 --subnet-name snet-$i --subnet-prefix 10.0.$i.0/28 --output none --no-wait
+done
+
+vnetNumber=0
+for ((i=0; i<=248; i+=8))
+do
+  vnetNumber=$((vnetNumber+1))
+  vnet_name=spk$vnetNumber-vnet
+  echo $vnet_name
+  #az network vnet create --resource-group $rg -l $region1 --name $vnet_name --address-prefix 10.1.$i.0/29 --subnet-name snet-$i --subnet-prefix 10.0.$i.0/29 --output none --no-wait
+done
+
+
+SecOctet=0
+SecOctetEnd=32
+for ((i=$SecOctet; i<=$SecOctetEnd; i++))
+do
+  echo 10.$i.0.0/29   
+  ThirdOctet=0
+  sleep 2
+  for ((j=$ThirdOctet; j<=248; j+=8))
+    do
+        echo 10.$i.$j.0/29
+
+        #az network vnet create --resource-group $rg -l $region1 --name spk$i$j-vnet --address-prefix 10.$i.$j.0/24 --subnet-name snet-$i$j --subnet-prefix 10.$i.$j.0/24 --output none --no-wait
+    done
+done
+
+vnetNumber=800
+timestart=25
+times=25
+while [[ $times != '32' ]];
+do    
+    times=$((times+1))
+    echo Timesssssssssssssssssss $times
+    #sleep 1    
+    for ((i=0; i<=248; i+=8))
+    do
+        vnetNumber=$((vnetNumber+1))
+        vnet_name=spk$vnetNumber-vnet
+        echo $vnet_name
+        echo 10.$timestart.$i.0/29
+        #az network vnet create --resource-group $rg -l $region1 --name $vnet_name --address-prefix 10.$timestart.$i.0/29 --subnet-name snet-$i --subnet-prefix 10.$timestart.$i.0/29 --output none --no-wait
+        
+    done
+    timestart=$((timestart+1))
+done
+
+#ResourceQuotaExceeded) Creating the resource of type 'Microsoft.Network/virtualNetworks' would exceed the quota of '800' resources of type 'Microsoft.Network/virtualNetworks' per scope. The current resource count is '800'. Please delete some resources of this type before creating a new one.
+#Code: ResourceQuotaExceeded
+#Message: Creating the resource of type 'Microsoft.Network/virtualNetworks' would exceed the quota of '800' resources of type 'Microsoft.Network/virtualNetworks' per scope. The current resource count is '800'. Please delete some resources of this type before creating a new one.
+
+
+#(VnetCountLimitReached) Cannot create more than 1000 virtual networks for this subscription in this region.
+#Code: VnetCountLimitReached
+#Message: Cannot create more than 1000 virtual networks for this subscription in this region.
+
+#(BadRequest) You have reached or exceeded the maximum number of resolution virtual networks allowed per private zone in subscription '2b73f762-264b-40ac-9ade-a1f95c5b2195'. You attempted to link 1001 resolution virtual networks of 1000 with a private zone.
+#Code: BadRequest
+#Message: You have reached or exceeded the maximum number of resolution virtual networks allowed per private zone in subscription '2b73f762-264b-40ac-9ade-a1f95c5b2195'. You attempted to link 1001 resolution virtual networks of 1000 with a private zone.
+
+#(Conflict) You have reached or exceeded the maximum number of zones per virtual network in subscription '2b73f762-264b-40ac-9ade-a1f95c5b2195'. You attempted to link 1001 zones of 1 with a virtual network.
+#Code: Conflict
+#Message: You have reached or exceeded the maximum number of zones per virtual network in subscription '2b73f762-264b-40ac-9ade-a1f95c5b2195'. You attempted to link 1001 zones of 1 with a virtual network.
+
+for vnet in $(az network vnet list -g $rg --query '[?contains(name,`'spk'`)].{name:name}' -o tsv)
+do
+ echo $vnet
+ az network private-dns link vnet create \
+    --resource-group lab-vwan \
+    --zone-name "eastus.azure.adp" \
+    --name $vnet-link \
+    --virtual-network $vnet \
+    --registration-enabled false
+done
+
+
+
+for ((i=802; i<=997; i++))
+do
+  echo Creating vnet link spk$i-vnet-link
+   az network private-dns link vnet create \
+    --resource-group lab-vwan \
+    --zone-name "eastus.azure.adp" \
+    --name "spk$i-vnet-link" \
+    --virtual-network /subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/lab-vwan2/providers/Microsoft.Network/virtualNetworks/spk$i-vnet \
+    --registration-enabled false \
+    --no-wait
+done
+
+
+
+dnszonename=privatedns.net
+for ((i=494; i<=505; i++))
+do
+  #echo Creating dns zone test$i.$dnszonename
+  #az network private-dns zone create --resource-group $rg --name test$i.privatedns.net --output none
+  echo Creating vnet link test$i.$dnszonename-link
+  az network private-dns link vnet create \
+    --resource-group $rg \
+    --zone-name test$i.$dnszonename \
+    --name vNetServices-eastus-link \
+    --virtual-network /subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/lab-vwan/providers/Microsoft.Network/virtualNetworks/vNetServices-eastus \
+    --registration-enabled false 
+    
+done
+
+dnszonename=dns.net
+for ((i=262; i<=505; i++))
+do
+  echo Creating dns zone zone$i.$dnszonename
+  az network private-dns zone create --resource-group $rg --name zone$i.$dnszonename 
+  echo Creating vnet link zone$i.$dnszonename-link
+  az network private-dns link vnet create \
+    --resource-group $rg \
+    --zone-name zone$i.$dnszonename \
+    --name vNetServices-eastus-link \
+    --virtual-network /subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/lab-vwan/providers/Microsoft.Network/virtualNetworks/vNetServices-eastus \
+    --registration-enabled false --no-wait   
+done
+
+az network private-dns link vnet create \
+    --resource-group $rg \
+    --zone-name test$i.privatedns.net \
+    --name vNetServices-eastus-link \
+    --virtual-network vNetServices-eastus \
+    --registration-enabled false \
+    --output none --no-wait

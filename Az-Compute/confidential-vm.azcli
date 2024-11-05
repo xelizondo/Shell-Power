@@ -1,0 +1,44 @@
+SubscriptionID="2b73f762-264b-40ac-9ade-a1f95c5b2195" # Shared Services
+az account set --subscription $SubscriptionID
+region1=eastus2 #set region1
+rg=rg-conf-vm #set resource group
+vmsize=Standard_B2s #set VM Size for all VMs
+username=az-admin
+password="LOCAL$$admin20204"
+
+az vm create \
+  --resource-group $rg \
+  --name ConfVM \
+  --size Standard_DC4es_v5 \
+  --admin-username $username \
+  --admin-password $password \
+  --enable-vtpm true \
+  --image "Canonical:0001-com-ubuntu-confidential-vm-jammy:22_04-lts-cvm:latest" \
+  --public-ip-sku Standard \
+  --security-type ConfidentialVM \
+  --os-disk-security-encryption-type VMGuestStateOnly \
+  --enable-secure-boot true \
+  --encryption-at-host \
+
+
+Connect-Graph -Tenant "132736d4-bb30-4536-a172-f2ed120852ec" Application.ReadWrite.All
+New-MgServicePrincipal -AppId bf7b6499-ff71-4aa2-97a4-f372087be7f0 -DisplayName "Confidential VM Orchestrator"
+
+az keyvault create -n kvxeconfvm -g $rg --enabled-for-disk-encryption true --sku premium --enable-purge-protection true
+
+
+
+
+az vm create \
+--resource-group $rg \
+--name ConfVM \
+--size Standard_DC4as_v5 \
+--admin-username $username \
+--admin-password $password \
+--enable-vtpm true \
+--enable-secure-boot true \
+--image "Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest" \
+--public-ip-sku Standard \
+--security-type ConfidentialVM \
+--os-disk-security-encryption-type DiskWithVMGuestState \
+--os-disk-secure-vm-disk-encryption-set $diskEncryptionSetID 

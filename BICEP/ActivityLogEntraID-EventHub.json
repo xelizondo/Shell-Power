@@ -1,0 +1,96 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "settingName": {
+        "type": "string",
+        "defaultValue": "sentToEventHub",
+        "metadata": {
+          "description": "The name of the diagnostic setting."
+        }
+      },
+      "eventHubAuthorizationRuleId": {
+        "type": "string",
+        "defaultValue": "/subscriptions/[xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx]/resourceGroups/[ResourceGroup]/providers/Microsoft.EventHub/namespaces/[eventhubnamespace]/authorizationrules/RootManageSharedAccessKey",
+        "metadata": {
+          "description": "The resource Id for the event hub authorization rule."
+        }
+      },
+      "eventHubName": {
+        "type": "string",
+        "defaultValue": "EventHubName",
+        "metadata": {
+          "description": "The name of the event hub."
+        }
+      }
+    },
+    "resources": [
+      {
+        "type": "microsoft.aadiam/diagnosticSettings",
+        "apiVersion": "2017-04-01",
+        "name": "[parameters('settingName')]",
+        "properties": {
+          "eventHubAuthorizationRuleId": "[parameters('eventHubAuthorizationRuleId')]",
+          "eventHubName": "[parameters('eventHubName')]",
+          "logs": [
+            {
+              "category": "AuditLogs",
+              "enabled": true
+            },
+            {
+              "category": "SignInLogs",
+              "enabled": true
+            },
+            {
+              "category": "NonInteractiveUserSignInLogs",
+              "enabled": true
+            },
+            {
+              "category": "ServicePrincipalSignInLogs",
+              "enabled": true
+            },
+            {
+              "category": "ManagedIdentitySignInLogs",
+              "enabled": true
+            },
+            {
+              "category": "ProvisioningLogs",
+              "enabled": true
+            },
+            {
+              "category": "ADFSSignInLogs",
+              "enabled": true
+            },
+            {
+              "category": "RiskyUsers",
+              "enabled": true
+            },
+            {
+              "category": "UserRiskEvents",
+              "enabled": true
+            },
+            {
+              "category": "NetworkAccessTrafficLogs",
+              "enabled": true
+            },
+            {
+              "category": "RiskyServicePrincipals",
+              "enabled": true
+            },
+            {
+              "category": "EnrichedOffice365AuditLogs",
+              "enabled": true
+            },
+            {
+              "category": "MicrosoftGraphActivityLogs",
+              "enabled": true
+            },
+             {
+              "category": "RemoteNetworkHealthLogs",
+              "enabled": true
+            }
+          ]
+        }
+      }
+    ]
+  }

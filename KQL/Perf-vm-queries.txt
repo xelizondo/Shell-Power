@@ -1,0 +1,71 @@
+Low Disk
+InsightsMetrics
+| where Origin == "vm.azm.ms"
+| where Namespace == "LogicalDisk" and Name == "FreeSpacePercentage" and Val <= 10
+| extend Disk=tostring(todynamic(Tags)["vm.azm.ms/mountId"])
+| where Disk != "D:" and Disk !startswith "/snap"
+| extend FreeSpace = Val
+| where TimeGenerated <= ago(15m)  // Show data from the last 15 minutes
+| project Computer, Disk, FreeSpace
+
+Pecent Memory Used
+InsightsMetrics
+| where Origin == "vm.azm.ms" and Namespace == "Memory"
+| extend TotalMemoryGB = (todynamic(Tags)["vm.azm.ms/memorySizeMB"]) / 1024
+| summarize FreeMemoryGB = avg(Val) / 1024 by Computer, TotalMemoryGB
+| extend PercentMemoryUsed = (1 - (FreeMemoryGB / TotalMemoryGB)) * 100
+| where TimeGenerated <= ago(15m) // Show data from the last 15 minutes
+| project Computer, PercentMemoryUsed
+
+Page File Usage
+Perf
+| where CounterName has "% Used Swap Space"
+| extend PageFileUsed = CounterValue
+| where TimeGenerated <= ago(15m)  // Show data from the last 15 minutes
+| project Computer, PageFileUsed
+
+
+Event
+| where EventLog == 'System'
+| where EventID == 7036
+| where Source == 'Service Control Manager'
+| parse kind=relaxed EventData with * "<Data Name=\"param1\">" Windows_Service_Name "</Data><Data Name=\"param2\">" Windows_Service_State "</Data>" *
+| where Windows_Service_Name == "Print Spooler" and Windows_Service_State == "stopped"
+
+Sql login
+# Import the required modules
+Import-Module Az.Accounts
+Import-Module Az.KeyVault
+Import-Module Az.Sql
+
+# Connect to Azure
+Connect-AzAccount
+
+# Get the credentials from Azure Key Vault
+$credential = Get-AzKeyVaultSecret -VaultName <vault-name> -Name <secret-name> | ConvertTo-SecureString -AsPlainText -Force
+
+# Connect to SQL Server
+$serverName = "<server-name>.database.windows.net"
+$databaseName = "<database-name>"
+$connectionString = "Server=tcp:$serverName,1433;Initial Catalog=$databaseName;Persist Security Info=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Credential=[Azure AD User];Authentication=Active Directory Password;"
+
+# Query sys tables
+$query = "SELECT * FROM sys.tables"
+Invoke-Sqlcmd -ConnectionString $connectionString -Credential $credential -Query $query
+
+
+Free space query for Linux
+InsightsMetrics
+| where Computer in (
+"CH1-UBNTVM", //Linux
+"DC10.na.contosohotels.com" // Windows
+)
+| where Namespace == "LogicalDisk"
+| where Name == "FreeSpacePercentage"
+| extend Disk=tostring(todynamic(Tags)["vm.azm.ms/mountId"])
+| summarize arg_max(TimeGenerated, *) by Disk, Computer
+| project TimeGenerated, Disk, Computer, Val
+| where Val > 90
+
+Perf | where CounterName has "% Free Space" | where CounterValue < ( 99.00)
+

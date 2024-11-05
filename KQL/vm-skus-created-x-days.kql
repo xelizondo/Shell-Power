@@ -1,0 +1,13 @@
+resources
+| where type =~ 'microsoft.compute/virtualmachines' 
+| where location =~ 'southcentral'
+| where todatetime(properties.timeCreated) > ago(30d)
+| extend vmSize = tostring(properties.hardwareProfile.vmSize)
+| summarize count() by bin(todatetime(properties.timeCreated), 1d), vmSize
+
+
+get the number of VMs that you have created over the last 30 days.
+Resources
+| where type =~ 'microsoft.compute/virtualmachines' and location =~ 'southcentralus'
+| where properties.timeCreated >= ago(30d)
+| summarize count() by bin(todatetime(properties.timeCreated), 1d)

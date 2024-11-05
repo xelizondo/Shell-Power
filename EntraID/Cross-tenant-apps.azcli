@@ -1,0 +1,94 @@
+#A multitenant application registration is created by the service provider in Tenant 1. 
+#A federated identity credential is created on this application using a user-assigned managed identity. 
+#Then, the name and application ID of the app is shared with the customer.
+
+#Set variables
+isvSubscriptionId="abac2234-77c7-4453-a3f3-96abd8e32c95" # Identity "36e57c16-e601-41b8-92b9-3a7e81386d8b" 
+isvRgName=RG-ManagedIdentities #set resource group
+isvLocation=eastus #set region1
+multiTenantAppName="multi-tenant-app-aadiag"
+userIdentityName="user-identity-multi-tenant-app-aadiag"
+
+#Set subscription context
+az account set --subscription $isvSubscriptionId
+
+# create isvRgName
+az group create -n $isvRgName -l $isvLocation
+
+#create app registration with AzureADMultipleOrgs sign-in audience
+multiTenantAppObjectId=$(az ad app create --display-name $multiTenantAppName \
+    --sign-in-audience AzureADMultipleOrgs \
+    --query id \
+    --output tsv)
+multiTenantAppId=$(az ad app show --id $multiTenantAppObjectId --query appId --output tsv)
+
+#Service Provider: create a user-assigned managed identity
+
+principalId=$(az identity create --name $userIdentityName \
+    --resource-group $isvRgName \
+    --location $isvLocation \
+    --subscription $isvSubscriptionId \
+    --query principalId \
+    --out tsv)
+
+#The service provider configures the user-assigned managed identity as a federated credential on the application
+#multiTenantAppObjectId="371b7f7f-6490-42c4-9ebb-efdf90079921"
+az ad app federated-credential create --id $multiTenantAppObjectId --parameters credential.json
+
+multiTenantAppId=$(az ad app list --display-name $multiTenantAppName --query "[].{appId:appId}" --output tsv)
+multiTenantObjectId=$(az ad app list --display-name $multiTenantAppName --query "[].{id:id}" --output tsv)
+echo App Client ID: $multiTenantAppId 
+echo App Object ID: $multiTenantObjectId
+
+App Client ID: b291c2d0-86b3-485f-9407-d05ff60568a3
+App Object ID: df860c21-6b6b-4e02-9aa3-554c475477a5
+
+Client value: NwY8Q~rvnRZqHyzTYFEJcTBjEg0Q_DQdpfh12bLQ
+Secret ID: aaaa3e5f-ae51-472c-ad91-e2daaaf85bd3
+
+az login --service-principal -u b291c2d0-86b3-485f-9407-d05ff60568a3 -p NwY8Q~rvnRZqHyzTYFEJcTBjEg0Q_DQdpfh12bLQ --tenant f989f7ca-1bfd-462f-8b39-7392b787ef46
+
+#create a resource group for the event hub
+isvLocation="eastus"
+isvSubscriptionId="2b73f762-264b-40ac-9ade-a1f95c5b2195"
+eventHubRgName="RG-EventHub"
+
+az account set --subscription $isvSubscriptionId
+az group create -n $eventHubRgName -l $isvLocation --subscription $isvSubscriptionId
+
+# Create an Event Hubs namespace. Specify a name for the Event Hubs namespace.
+namespaceName="xeeventhubns$RANDOM"
+az eventhubs namespace create --name $namespaceName --resource-group $eventHubRgName -l $isvLocation
+
+# Create an event hub in event hub namespace 
+eventhubName="xeeventhub$RANDOM"
+az eventhubs eventhub create --name $eventhubName --resource-group $eventHubRgName --namespace-name $namespaceName
+
+
+###################CUSTOMER SIDE######################
+#The customer installs the service provider application in the customer tenant
+
+# Create the service principal with the registered app's application ID (client ID)
+multiTenantAppId="b291c2d0-86b3-485f-9407-d05ff60568a3"
+az ad sp create --id $multiTenantAppId --query id --out tsv #795f55c0-81ef-4eeb-9fdb-388f5e5ba6db
+
+
+#The customer grants the service provider application access to the resource
+servicePrincipalId=$(az ad sp show --id $multiTenantAppId --query id --output tsv)
+eventHubId=/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/RG-EventHub/providers/Microsoft.EventHub/namespaces/xeeventhubns19641
+az role assignment create --role "Azure Event Hubs Data Owner" \
+    --scope $eventHubId \
+    --assignee-object-id $servicePrincipalId
+    --asignee-principal-type ServicePrincipal
+
+
+
+    {
+  "appId": "0137119a-3d2e-4b1a-ae07-17643b2647a1",
+  "displayName": "multi-tenant-app",
+  "password": "s578Q~fnRPUnRyD.xw~lnxdr39bf6PZGZRUDQdbP",
+  "tenant": "f989f7ca-1bfd-462f-8b39-7392b787ef46"
+}
+
+az login --service-principal -u <app-id> -p <password-or-cert> --tenant <tenant>
+az deployment tenant create --location <location> --template-file <path-to-template>

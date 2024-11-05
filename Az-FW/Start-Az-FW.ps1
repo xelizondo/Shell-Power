@@ -40,22 +40,30 @@ Set-AzContext -subscriptionId $subID
 $firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
 # // Deallocate Firewall
 $firewall.deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+$firewallRG = "rg-connectivity-core-eastus2"
+$firewallName = "AzFW-Hub-EastUS2"
+$subID = "2b73f762-264b-40ac-9ade-a1f95c5b2195"  #MS-XE-CSA-AIA-Shared-Services
+Set-AzContext -subscriptionId $subID
+$firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
+# // Deallocate Firewall
+$firewall.deallocate()
 $firewall | Set-AzFirewall
 
 
-# // AIRS Start FW
-$firewallRG = "RG-Hub-Core"
-$firewallName = "AzFW-Hub-EastUS"
-$subID = "1b233659-609f-49c0-bf59-f06289eb96e1"  #MS-XE-CSA-AIRS
+
+# // Shared Services Start FW
+$firewallRG = "rg-connectivity-core-eastus2"
+$firewallName = "AzFW-Hub-EastUS2"
+$subID = "2b73f762-264b-40ac-9ade-a1f95c5b2195"  #MS-XE-CSA-AIA-Shared-Services
 Set-AzContext -subscriptionId $subID
 $firewall=Get-AzFirewall -ResourceGroupName $firewallRG -Name $firewallName
 # // Allocate Firewall
-$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "vNET-Hub"
-$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "pip-AzFW-HubEastUS"
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $firewallRG -Name "vnet-connectivity-core-eastus2"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $firewallRG -Name "AzFW-Hub-EastUS2-pip"
 $firewall.Allocate($vnet, $pip)
-$firewall | Set-AzFirewall
-
-
+$firewall | Set-AzFirewall -AsJob
 
 # // VS START FW
 $firewallRG = "RG-Connectivity-Core"
@@ -102,7 +110,7 @@ $firewall = Get-AzFirewall -Name $firewallName -ResourceGroupName $firewallRG
 
 # stop 
 $firewall.Deallocate()
-$firewall | Set-AzFirewall
+$firewall | Set-AzFirewall -AsJob
 
 # start
 $firewall.Allocate($virtualhub.Id)

@@ -1,0 +1,6 @@
+az vm list-skus --resource-type availabilitySets --query '[?name==`Aligned`].{Location:locationInfo[0].location, MaximumFaultDomainCount:capabilities[0].value}' -o Table
+
+#list number of avaialbility zones in azure
+
+
+az account list-locations 

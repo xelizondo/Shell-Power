@@ -1,0 +1,26 @@
+{
+    "properties": {
+      "displayName": "Deny Microsoft.Network provider",
+      "policyType": "Custom",
+      "mode": "All",
+      "description": "This policy denies the use of the Microsoft.Network provider.",
+      "metadata": {
+        "version": "1.0.0",
+        "category": "Network"
+      },
+      "parameters": {},
+      "policyRule": {
+        "if": {
+          "allOf": [
+            {
+              "field": "type",
+              "like": "Microsoft.Network/*"
+            }
+          ]
+        },
+        "then": {
+          "effect": "deny"
+        }
+      }
+    }
+  }

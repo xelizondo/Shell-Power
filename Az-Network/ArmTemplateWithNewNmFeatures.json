@@ -1,0 +1,121 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "networkManagers_TestArmTemplateDeployments_name": {
+            "defaultValue": "TestArmTemplateDeployments",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkManagers",
+            "apiVersion": "2023-11-01",
+            "name": "[parameters('networkManagers_TestArmTemplateDeployments_name')]",
+            "location": "centralus",
+            "properties": {
+                "networkManagerScopes": {
+                    "managementGroups": [
+                        "/providers/Microsoft.Management/managementGroups/alecolson_testmg3"
+                    ],
+                    "subscriptions": []
+                },
+                "networkManagerScopeAccesses": [
+                    "SecurityAdmin"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkManagers/networkGroups",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('networkManagers_TestArmTemplateDeployments_name'), '/SubnetGroupCreatedViaArmTemplate')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkManagers', parameters('networkManagers_TestArmTemplateDeployments_name'))]"
+            ],
+            "properties": {
+                "description": "Created using an arm template",
+                "memberType": "Subnet"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkManagers/networkGroups",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('networkManagers_TestArmTemplateDeployments_name'), '/RuleCollectionNg')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkManagers', parameters('networkManagers_TestArmTemplateDeployments_name'))]"
+            ],
+            "properties": {
+                "description": "Just a normal vnet group",
+                "memberType": "VirtualNetwork"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkManagers/securityAdminConfigurations",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('networkManagers_TestArmTemplateDeployments_name'), '/ArmTemplateConfig')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkManagers', parameters('networkManagers_TestArmTemplateDeployments_name'))]"
+            ],
+            "properties": {
+                "applyOnNetworkIntentPolicyBasedServices": [
+                    "None"
+                ],
+                "networkGroupAddressSpaceAggregationOption": "Manual"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkManagers/securityAdminConfigurations/ruleCollections",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('networkManagers_TestArmTemplateDeployments_name'), '/ArmTemplateConfig/ArmTemplateAdminRuleColl')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkManagers/securityAdminConfigurations', parameters('networkManagers_TestArmTemplateDeployments_name'), 'ArmTemplateConfig')]",
+                "[resourceId('Microsoft.Network/networkManagers', parameters('networkManagers_TestArmTemplateDeployments_name'))]",
+                "[resourceId('Microsoft.Network/networkManagers/networkGroups', parameters('networkManagers_TestArmTemplateDeployments_name'), 'RuleCollectionNg')]"
+            ],
+            "properties": {
+                "appliesToGroups": [
+                    {
+                        "networkGroupId": "[resourceId('Microsoft.Network/networkManagers/networkGroups', parameters('networkManagers_TestArmTemplateDeployments_name'), 'RuleCollectionNg')]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkManagers/securityAdminConfigurations/ruleCollections/rules",
+            "apiVersion": "2023-11-01",
+            "name": "[concat(parameters('networkManagers_TestArmTemplateDeployments_name'), '/ArmTemplateConfig/ArmTemplateAdminRuleColl/ArmTemplateRule')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkManagers/networkGroups', parameters('networkManagers_TestArmTemplateDeployments_name'), 'SubnetGroupCreatedViaArmTemplate')]",
+                "[resourceId('Microsoft.Network/networkManagers/securityAdminConfigurations/ruleCollections', parameters('networkManagers_TestArmTemplateDeployments_name'), 'ArmTemplateConfig', 'ArmTemplateAdminRuleColl')]",
+                "[resourceId('Microsoft.Network/networkManagers/securityAdminConfigurations', parameters('networkManagers_TestArmTemplateDeployments_name'), 'ArmTemplateConfig')]",
+                "[resourceId('Microsoft.Network/networkManagers', parameters('networkManagers_TestArmTemplateDeployments_name'))]"
+            ],
+            "properties": {
+                "description": "Created via arm template - contains network group as destination.",
+                "priority": 1,
+                "protocol": "Tcp",
+                "direction": "Inbound",
+                "access": "Deny",
+                "sources": [
+                    {
+                        "addressPrefixType": "ServiceTag",
+                        "addressPrefix": "Internet"
+                    }
+                ],
+                "destinations": [
+                    {
+                        "addressPrefixType": "NetworkGroup",
+                        "addressPrefix": "/subscriptions/2b30d012-943d-45ac-9ebd-cf3ee39edf9a/resourceGroups/jaredgorthy-rg/providers/Microsoft.Network/networkManagers/TestArmTemplateDeployments/networkGroups/SubnetGroupCreatedViaArmTemplate"
+                    }
+                ],
+                "sourcePortRanges": [
+                    "0-65535"
+                ],
+                "destinationPortRanges": [
+                    "0-65535"
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,194 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    
+    "resources": [
+        {
+            "type": "Microsoft.Migrate/MigrateProjects",
+            "apiVersion": "2020-06-01-preview",
+            "name": "AzM-Project-Manual",
+            "location": "westus2",
+            "dependsOn": [],
+            "tags": {
+                "Migrate Project": "AzM-Project-Manual"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "publicNetworkAccess": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "AzM-Project-Manual/Servers-Assessment-ServerAssessment",
+            "dependsOn": [
+                "/subscriptions/e446e661-f7b9-4343-b93a-1e719e986bd0/resourceGroups/Az-Migrate-Projects5/providers/Microsoft.Migrate/MigrateProjects/AzM-Project-Manual"
+            ],
+            "properties": {
+                "tool": "ServerAssessment",
+                "purpose": "Assessment",
+                "goal": "Servers",
+                "status": "Active",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "AzM-Project-Manual/Servers-Discovery-ServerDiscovery",
+            "dependsOn": [
+                "/subscriptions/e446e661-f7b9-4343-b93a-1e719e986bd0/resourceGroups/Az-Migrate-Projects5/providers/Microsoft.Migrate/MigrateProjects/AzM-Project-Manual/Solutions/Servers-Assessment-ServerAssessment"
+            ],
+            "properties": {
+                "tool": "ServerDiscovery",
+                "purpose": "Discovery",
+                "goal": "Servers",
+                "status": "Inactive",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "AzM-Project-Manual/Servers-Migration-ServerMigration",
+            "dependsOn": [
+                "/subscriptions/e446e661-f7b9-4343-b93a-1e719e986bd0/resourceGroups/Az-Migrate-Projects5/providers/Microsoft.Migrate/MigrateProjects/AzM-Project-Manual/Solutions/Servers-Discovery-ServerDiscovery"
+            ],
+            "properties": {
+                "tool": "ServerMigration",
+                "purpose": "Migration",
+                "goal": "Servers",
+                "status": "Active",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "Microsoft.Migrate.CreatePE-migrate-Manual",
+            "dependsOn": [
+                "/subscriptions/e446e661-f7b9-4343-b93a-1e719e986bd0/resourceGroups/Az-Migrate-Projects5/providers/Microsoft.Migrate/MigrateProjects/AzM-Project-Manual"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2020-05-01",
+                            "name": "AzM-Project-Manual-PE",
+                            "type": "Microsoft.Network/privateEndpoints",
+                            "properties": {
+                                "privateLinkServiceConnections": [
+                                    {
+                                        "name": "AzM-Project-Manual-PE",
+                                        "properties": {
+                                            "privateLinkServiceId": "/subscriptions/e446e661-f7b9-4343-b93a-1e719e986bd0/resourceGroups/Az-Migrate-Projects5/providers/Microsoft.Migrate/MigrateProjects/AzM-Project-Manual",
+                                            "groupIds": [
+                                                "Default"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "subnet": {
+                                    "id": "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/virtualNetworks/vnet-az-migrate/subnets/snet-pes"
+                                }
+                            },
+                            "dependsOn": [],
+                            "location": "westus2",
+                            "tags": {
+                                "MigrateProject": "AzM-Project-Manual"
+                            }
+                        },
+                        {
+                            "apiVersion": "2018-09-01",
+                            "name": "privatelink.prod.migration.windowsazure.com",
+                            "type": "Microsoft.Network/privateDnsZones",
+                            "properties": {},
+                            "dependsOn": [
+                                "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/privateEndpoints/AzM-Project-Manual-PE"
+                            ],
+                            "location": "global"
+                        },
+                        {
+                            "apiVersion": "2018-09-01",
+                            "name": "privatelink.prod.migration.windowsazure.com/vnet-az-migrate2811vnetlink",
+                            "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                            "properties": {
+                                "virtualNetwork": {
+                                    "id": "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/virtualNetworks/vnet-az-migrate"
+                                },
+                                "registrationEnabled": false
+                            },
+                            "dependsOn": [
+                                "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/privateDnsZones/privatelink.prod.migration.windowsazure.com"
+                            ],
+                            "location": "global"
+                        },
+                        {
+                            "apiVersion": "2020-05-01",
+                            "name": "AzM-Project-Manual-PE/AzM-Project-Manual-dnszonegroup",
+                            "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                            "properties": {
+                                "privateDnsZoneConfigs": [
+                                    {
+                                        "name": "privatelink.prod.migration.windowsazure.com",
+                                        "properties": {
+                                            "privateDnsZoneId": "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/privateDnsZones/privatelink.prod.migration.windowsazure.com"
+                                        }
+                                    }
+                                ]
+                            },
+                            "dependsOn": [
+                                "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/privateEndpoints/AzM-Project-Manual-PE",
+                                "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/privateDnsZones/privatelink.prod.migration.windowsazure.com"
+                            ],
+                            "location": "westus2"
+                        }
+                    ]
+                }
+            },
+            "subscriptionId": "2b73f762-264b-40ac-9ade-a1f95c5b2195",
+            "resourceGroup": "rg-az-migrate-network"
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "Microsoft.MigrateV2.UpdateSDSSolutionData-AfterPE",
+            "dependsOn": [
+                "Microsoft.Migrate.CreatePE-migrate-Manual"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2020-06-01-preview",
+                            "name": "AzM-Project-Manual/Servers-Discovery-ServerDiscovery",
+                            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+                            "properties": {
+                                "tool": "ServerDiscovery",
+                                "purpose": "Discovery",
+                                "goal": "Servers",
+                                "status": "Inactive",
+                                "details": {
+                                    "extendedDetails": {
+                                        "privateEndpointDetails": "{\"subnetId\":\"/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/rg-az-migrate-network/providers/Microsoft.Network/virtualNetworks/vnet-az-migrate/subnets/snet-pes\",\"virtualNetworkLocation\":\"westus2\",\"skipPrivateDnsZoneCreation\":false}"
+                                    }
+                                }
+                            },
+                            "dependsOn": []
+                        }
+                    ]
+                }
+            },
+            "subscriptionId": "e446e661-f7b9-4343-b93a-1e719e986bd0",
+            "resourceGroup": "Az-Migrate-Projects5"
+        }
+    ]
+}

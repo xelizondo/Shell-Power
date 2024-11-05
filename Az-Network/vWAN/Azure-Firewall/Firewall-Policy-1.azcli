@@ -1,0 +1,109 @@
+# Parameters (make changes based on your requirements)
+SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
+SubscriptionID="2b73f762-264b-40ac-9ade-a1f95c5b2195" # Shared Services
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
+region1=eastus #set region1
+region2=westus #set region2
+rg=RG-Connectivity-Core #set resource group
+azfwname=AzFW-Hub-EastUS
+ngcg=NetworkRuleCollectionGroup
+firewallsku=Standard #Azure Firewall SKU Standard or Premium
+fwpolicyname=$region1-fwpolicy #Firewall Policy Name
+
+az network firewall policy create --name $fwpolicyname --resource-group $rg --sku $firewallsku --enable-dns-proxy true --output none --only-show-errors
+az network firewall policy rule-collection-group create --name $ngcg --priority 500 --policy-name $fwpolicyname --resource-group $rg --output none --only-show-errors
+#Adding any-to-any firewall rule
+az network firewall policy rule-collection-group collection add-filter-collection \
+ --resource-group $rg \
+ --policy-name $fwpolicyname \
+ --name NetworkRuleCollection-Allow \
+ --rcg-name $ngcg \
+ --rule-type NetworkRule \
+ --rule-name AnytoAny \
+ --action Allow \
+ --ip-protocols "Any" \
+ --source-addresses "*" \
+ --destination-addresses  "*" \
+ --destination-ports "*" \
+ --collection-priority 100 \
+ --output none
+
+az network firewall policy rule-collection-group collection add-filter-collection \
+ --resource-group $rg \
+ --policy-name $fwpolicyname \
+ --name NetworkRuleCollection-Allow \
+ --rcg-name $ngcg \
+ --rule-type NetworkRule \
+ --rule-name APIM-mgmt \
+ --action Allow \
+ --ip-protocols "TCP" \
+ --source-addresses "*" \
+ --destination-addresses  "*" \
+ --destination-ports "3443" \
+ --collection-priority 501 \
+ --output none
+
+az network firewall policy rule-collection-group collection rule add \
+ --resource-group $rg \
+ --collection-name NetworkRuleCollection-Allow \
+ --policy-name $fwpolicyname \
+ --name AzLB \
+ --rcg-name $ngcg \
+ --rule-type NetworkRule \
+ --ip-protocols "TCP" \
+ --source-addresses "*" \
+ --destination-addresses  "*" \
+ --destination-ports "6390" \
+ --output none
+
+ az network firewall policy rule-collection-group collection rule remove \
+ --resource-group $rg \
+ --collection-name NetworkRuleCollection-Allow \
+ --policy-name $fwpolicyname \
+ --name AzBackup \
+ --rcg-name $ngcg 
+
+az network firewall policy rule-collection-group collection rule add \
+ --resource-group $rg \
+ --collection-name NetworkRuleCollection-Allow \
+ --policy-name $fwpolicyname \
+ --name API-Azure-HTTPS \
+ --rcg-name $ngcg \
+ --rule-type NetworkRule \
+ --ip-protocols "TCP" \
+ --source-addresses "*" \
+--destination-ports "443" \
+--destination-addresses "AzureActiveDirectory AzBackup" 
+
+
+
+echo Deploying Azure Firewall $azfwname ...
+fwpolid=$(az network firewall policy show --resource-group $rg --name $fwpolicyname --query id --output tsv)
+az network firewall create -g $rg -n $azfwname --sku AZFW_Hub --tier $firewallsku --virtual-hub $azfwname --public-ip-count 1 --firewall-policy $fwpolid --location $region1 --output none
+
+#Start Std FW
+$rg = "RG-Connectivity-Core"
+$firewallName = "AzFW-Hub-EastUS"
+$SubscriptionID = "af3717f4-48d1-42d5-8b79-453a28496737" 
+Set-AzContext -subscriptionId $SubscriptionID
+$firewall=Get-AzFirewall -ResourceGroupName $rg -Name $firewallName
+# // Allocate Firewall
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $rg -Name "vnet-connectivity-core-eastus"
+$pip = Get-AzPublicIpAddress -ResourceGroupName $rg -Name "pip-AzFW-HubEastUS"
+$firewall.Allocate($vnet, $pip)
+$firewall | Set-AzFirewall -AsJob
+
+$firewallRG = "RG-Connectivity-Core"
+$SubscriptionID = "af3717f4-48d1-42d5-8b79-453a28496737" #connectivity
+Set-AzContext -subscriptionId $SubscriptionID
+$firewall = Get-AzFirewall -ResourceGroupName $firewallRG
+# // Deallocate Firewall
+$firewall.deallocate()
+$firewall | Set-AzFirewall -AsJob
+
+
+
+#azure cli deallocate azure firewall
+
+
+

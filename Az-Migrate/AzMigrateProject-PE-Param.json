@@ -1,0 +1,238 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+        "parameters": {
+            "LocationAzureRegion": {
+            "type": "string",
+            "defaultValue": "westus2"
+        },
+        "SubscriptionIdAzMigrateProject": {
+            "type": "String",
+            "defaultValue": "e446e661-f7b9-4343-b93a-1e719e986bd0"
+        },
+        "SubscriptionIdDNSZone": {
+            "type": "String",
+            "defaultValue": "2b73f762-264b-40ac-9ade-a1f95c5b2195"
+        },        
+        "SubscriptionIdPE": {
+            "type": "String",
+            "defaultValue": "2b73f762-264b-40ac-9ade-a1f95c5b2195"
+        },                
+        "AzureMigrateProjectName": {
+            "type": "String",
+            "defaultValue": "AzM-Project-Custom"
+        },
+        "ResourceGroupAzMigrateProject": {
+            "type": "String",
+            "defaultValue": "RG-Az-Migrate-Custom"
+        },
+        "ResourceGroupVNET": {
+            "type": "String",
+            "defaultValue": "rg-az-migrate-network"
+        },
+        "VNETName": {
+            "type": "String",
+            "defaultValue": "vnet-az-migrate"
+        },
+        "SubnetName": {
+            "type": "String",
+            "defaultValue": "snet-pes"
+        },
+        "ResourceGroupDNSZone": {
+            "type": "String",
+            "defaultValue": "rg-az-migrate-network"
+        }
+    },
+    "variables": {
+     "AzMigrateDNSZoneName": "privatelink.prod.migration.windowsazure.com"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Migrate/MigrateProjects",
+            "apiVersion": "2020-06-01-preview",
+            "name": "[parameters('AzureMigrateProjectName')]",
+            "location": "[parameters('LocationAzureRegion')]",
+            "dependsOn": [],
+            "tags": {
+                "Migrate Project": "[parameters('AzureMigrateProjectName')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "publicNetworkAccess": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "[concat(parameters('AzureMigrateProjectName'), '/Servers-Assessment-ServerAssessment')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Migrate/migrateProjects', parameters('AzureMigrateProjectName'))]"
+            ],
+            "properties": {
+                "tool": "ServerAssessment",
+                "purpose": "Assessment",
+                "goal": "Servers",
+                "status": "Active",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "[concat(parameters('AzureMigrateProjectName'), '/Servers-Discovery-ServerDiscovery')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Migrate/migrateProjects', parameters('AzureMigrateProjectName'))]"
+            ],
+            "properties": {
+                "tool": "ServerDiscovery",
+                "purpose": "Discovery",
+                "goal": "Servers",
+                "status": "Inactive",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+            "apiVersion": "2020-06-01-preview",
+            "name": "[concat(parameters('AzureMigrateProjectName'), '/Servers-Migration-ServerMigration')]", 
+            "dependsOn": [
+                "[resourceId('Microsoft.Migrate/migrateProjects', parameters('AzureMigrateProjectName'))]"
+            ],
+            "properties": {
+                "tool": "ServerMigration",
+                "purpose": "Migration",
+                "goal": "Servers",
+                "status": "Active",
+                "details": null
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "Microsoft.Migrate.CreatePE-migrate-Manual",
+            "dependsOn": [
+                "[resourceId('Microsoft.Migrate/migrateProjects', parameters('AzureMigrateProjectName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2020-05-01",
+                            "name": "[concat(parameters('AzureMigrateProjectName'), '-PE')]", 
+                            "type": "Microsoft.Network/privateEndpoints",
+                            "properties": {
+                                "privateLinkServiceConnections": [
+                                    {
+                                        "name": "[concat(parameters('AzureMigrateProjectName'), '-PE')]",
+                                        "properties": {
+                                            "privateLinkServiceId": "[resourceId('Microsoft.Migrate/migrateProjects', parameters('AzureMigrateProjectName'))]",
+                                            "groupIds": [
+                                                "Default"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "subnet": {
+                                    "id": "[resourceId(parameters('ResourceGroupVNET'), 'Microsoft.Network/virtualNetworks/subnets', parameters('VNETName'), parameters('subnetName'))]"
+                                }
+                            },
+                            "dependsOn": [],
+                            "location": "[parameters('LocationAzureRegion')]",
+                            "tags": {
+                                "MigrateProject": "[concat(parameters('AzureMigrateProjectName'))]"
+                            }
+                        },
+                        {
+                            "apiVersion": "2018-09-01",
+                            "name": "[variables('AzMigrateDNSZoneName')]",
+                            "type": "Microsoft.Network/privateDnsZones",
+                            "properties": {},
+                            "dependsOn": [
+                                "[concat(parameters('AzureMigrateProjectName'), '-PE')]"
+                            ],
+                            "location": "global"
+                        },
+                        {
+                            "apiVersion": "2018-09-01",
+                            "name": "[concat(parameters('AzureMigrateProjectName'), '/', parameters('VNETName'), '-vnetlink')]",
+                            "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                            "properties": {
+                                "virtualNetwork": {
+                                    "id": "[resourceId(parameters('ResourceGroupVNET'), 'Microsoft.Network/virtualNetworks', parameters('VNETName'))]"
+                                },
+                                "registrationEnabled": false
+                            },
+                            "dependsOn": [
+                                "[variables('AzMigrateDNSZoneName')]"
+                            ],
+                            "location": "global"
+                        },
+                        {
+                            "apiVersion": "2020-05-01",
+                            "name": "[concat(parameters('AzureMigrateProjectName'), '/', parameters('AzureMigrateProjectName'), '-dnszonegroup')]",
+                            "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                            "properties": {
+                                "privateDnsZoneConfigs": [
+                                    {
+                                        "name": "[variables('AzMigrateDNSZoneName')]",
+                                        "properties": {
+                                            "privateDnsZoneId": "[resourceId(parameters('ResourceGroupDNSZone'), 'Microsoft.Network/privateDnsZones', variables('AzMigrateDNSZoneName'))]"
+                                        }
+                                    }
+                                ]
+                            },
+                            "dependsOn": [
+                                "[concat(parameters('AzureMigrateProjectName'), '-PE')]",
+                                "[variables('AzMigrateDNSZoneName')]"
+                            ],
+                            "location": "[parameters('LocationAzureRegion')]"
+                        }
+                    ]
+                }
+            },
+            "subscriptionId": "[parameters('subscriptionIdPE')]",
+            "resourceGroup": "[parameters('ResourceGroupVNET')]"
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "Microsoft.MigrateV2.UpdateSDSSolutionData-AfterPE",
+            "dependsOn": [
+                "Microsoft.Migrate.CreatePE-migrate-Manual"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2020-06-01-preview",
+                            "name": "AzM-Project-Manual/Servers-Discovery-ServerDiscovery",
+                            "type": "Microsoft.Migrate/MigrateProjects/Solutions",
+                            "properties": {
+                                "tool": "ServerDiscovery",
+                                "purpose": "Discovery",
+                                "goal": "Servers",
+                                "status": "Inactive",
+                                "details": {
+                                    "extendedDetails": {
+                                        "privateEndpointDetails": "{\"subnetId\":\"[resourceId(parameters('ResourceGroupVNET'), 'Microsoft.Network/virtualNetworks/subnets', parameters('VNETName'), parameters('subnetName'))]\",\"virtualNetworkLocation\":\"westus2\",\"skipPrivateDnsZoneCreation\":false}"
+                                    }
+                                }
+                            },
+                            "dependsOn": []
+                        }
+                    ]
+                }
+            },
+            "subscriptionId": "[parameters('SubscriptionIdAzMigrateProject')]",
+            "resourceGroup": "[parameters('ResourceGroupAzMigrateProject')]"
+        }
+    ]
+}
