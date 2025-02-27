@@ -1,0 +1,235 @@
+
+# Parameters (make changes based on your requirements)
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
+region1=eastus #set region1
+rg=lab-aks-nat #set resource group
+
+vpngwsize=VpnGw2 #set VPN Gateway SKU
+mypsk="f99d23f6010dbd7f58ce97820cf43e493f4727683e78090cd92ef6e" #set shared key=====5
+
+vnetaks="vnet-aks"
+snaksvm="sn-aksvm"
+
+vnetakstransit="vnet-aks-transit"
+vnetakstransitprefix="172.16.1.0/24"
+vpngwtransitename=vpngwtransit
+vpngwtransitipname=pip-vpntransitgw1
+lngcxname="lng-cx1"
+lngcxprefix="192.168.10.0/24"
+connectioncxname="cx-s2s-vpn"
+
+
+vnetcx="vnet-cx"
+sncxvm="sn-cx-vm"
+vnetcxprefix="192.168.10.0/24"
+vpngwcxname=vpngwcx
+vpngwcxipname=pip-vpncxgw1
+lngtransitname="lng-azure-transit"
+lngtransitprefix="172.16.1.0/24"
+connectiontransitname="az-transit-s2s-vpn"
+
+
+vmsize=Standard_B2s #set VM Size for all VMs
+username=az-admin
+password=""
+
+#create AKS environment variables with AGIC
+
+alias k='kubectl'
+alias k
+networkplugin=azure                    # Network plugin to use for the AKS cluster
+acrname="acrxeaks"                   # Azure Container Registry name
+aksclustername="aks-cluster1"       # AKS cluster name
+aksdnsprefix="xeaks-cniagic"    # DNS name prefix for the AKS cluster
+managedidentity="mi-aks"                # Managed identity name
+nodesrg=lab-MC-aks-nat_aks-cluster1_$region1 # Node resource group name
+
+#Set subscription context
+az account set --subscription $SubscriptionID
+
+#Variables
+mypip="162.207.71.133"
+#mypip=$(curl -4 ifconfig.io -s)
+
+# create rg
+az group create -n $rg -l $region1 --output none
+
+# create vnet for AKS
+az network vnet create --address-prefixes 10.10.1.0/22 -n $vnetaks -g $rg -l $region1 --subnet-name sn-aks --subnet-prefixes 10.10.1.0/24 --output none
+az network vnet subnet create -g $rg --vnet-name $vnetaks -n sn-agic --address-prefixes 10.10.2.0/24 --output none
+az network vnet subnet create -g $rg --vnet-name $vnetaks -n $snaksvm --address-prefixes 10.10.3.0/28 --output none
+
+# create vnet for transit
+az network vnet create --address-prefixes $vnetakstransitprefix -n $vnetakstransit -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 172.16.1.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name $vnetakstransit -n AzureFirewallSubnet --address-prefixes 172.16.1.64/26 --output none
+
+# create vnet for cx
+az network vnet create --address-prefixes $vnetcxprefix -n $vnetcx -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 192.168.10.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name $vnetcx -n $sncxvm --address-prefixes 192.168.10.64/28 --output none
+
+#create vnet peering between AKS and Transit
+az network vnet peering create -g $rg -n To-$vnetakstransit --vnet-name $vnetaks --remote-vnet $vnetakstransit --allow-vnet-access yes --allow-forwarded-traffic yes --output none
+az network vnet peering create -g $rg -n To-$vnetaks --vnet-name $vnetakstransit --remote-vnet $vnetaks --allow-vnet-access yes --allow-forwarded-traffic yes --output none
+
+#create a VPN Gateway for the AKS transit network
+az network public-ip create -n $vpngwtransitipname -g $rg --allocation-method Static --sku Standard --version IPv4 -o tsv
+vpngwtransitip=$(az network public-ip show -n $vpngwtransitipname -g $rg --query ipAddress -o tsv)
+vnettransitid=$(az network vnet show -g $rg -n $vnetakstransit --query id -o tsv)
+az network vnet-gateway create -g $rg --name $vpngwtransitename --public-ip-address $vpngwtransitipname --vnet $vnettransitid --gateway-type Vpn --vpn-type RouteBased --sku $vpngwsize -o none --no-wait
+
+#create a VPN Gateway for the cx network
+az network public-ip create -n $vpngwcxipname -g $rg --allocation-method Static --sku Standard --version IPv4 -o tsv
+vpngcxwip=$(az network public-ip show -n $vpngwcxipname -g $rg --query ipAddress -o tsv)
+vnetcxid=$(az network vnet show -g $rg -n $vnetcx --query id -o tsv)
+az network vnet-gateway create -g $rg --name $vpngwcxname --public-ip-address $vpngwcxipname --vnet $vnetcxid --gateway-type Vpn --vpn-type RouteBased --sku $vpngwsize -o none
+
+#Local Network Gateway to reach cx network from aks transit network
+az network local-gateway create -g $rg --name $lngcxname --gateway-ip-address $vpngcxwip --local-address-prefixes $lngcxprefix --output none
+#Local Network Gateway to reach aks transit network from cx network
+az network local-gateway create -g $rg --name $lngtransitname --gateway-ip-address $vpngwtransitip --local-address-prefixes $lngtransitprefix --output none
+#create connection in transit gw to reach cx network
+az network vpn-connection create -g $rg --name $connectioncxname --vnet-gateway1 $vpngwtransitename --local-gateway2 $lngcxname --shared-key $mypsk
+#create connection in cx gw to reach aks transit network
+az network vpn-connection create -g $rg --name $connectiontransitname --vnet-gateway1 $vpngwcxname --local-gateway2 $lngtransitname --shared-key $mypsk
+
+
+echo Creating $hub1name Azure Firewall Policy
+#Create firewall rules
+fwpolicyname=azfwpolicy #Firewall Policy Name
+firewallsku=Standard #Firewall SKU
+az network firewall policy create --name $fwpolicyname --resource-group $rg --sku $firewallsku --enable-dns-proxy true --output none --only-show-errors
+az network firewall policy rule-collection-group create --name NetworkRuleCollectionGroup --priority 200 --policy-name $fwpolicyname --resource-group $rg --output none --only-show-errors
+#Adding any-to-any firewall rule
+az network firewall policy rule-collection-group collection add-filter-collection \
+    --resource-group $rg \
+    --policy-name $fwpolicyname \
+    --name GenericCollection \
+    --rcg-name NetworkRuleCollectionGroup \
+    --rule-type NetworkRule \
+    --rule-name AnytoAny \
+    --action Allow \
+    --ip-protocols "Any" \
+    --source-addresses "*" \
+    --destination-addresses  "*" \
+    --destination-ports "*" \
+    --collection-priority 100 \
+    --output none
+
+echo Deploying Azure Firewall in transit $vnetakstransit
+fwpolid=$(az network firewall policy show --resource-group $rg --name $fwpolicyname --query id --output tsv)
+az network public-ip create -n pip-azfw -g $rg --sku Standard --location $region1 --allocation-method Static
+#create azure firewall using the previously created public ip and the firewall policy
+az network firewall create -g $rg -n azfw-transit --sku AZFW_VNet --tier $firewallsku --firewall-policy $fwpolid --location $region1 --public-ip pip-azfw
+az network firewall ip-config create -g $rg -f azfw-transit -n ipcfg-azfw-transit --vnet-name $vnetakstransit --subnet AzureFirewallSubnet --public-ip-address pip-azfw
+az network firewall update -g $rg -n azfw-transit
+
+
+
+# Get the virtual network resource ID
+VNET_ID=$(az network vnet show -g $rg --name $vnetaks --query id -o tsv)
+echo $VNET_ID
+
+# Get the virtual network subnet resource ID
+SUBNET_ID=$(az network vnet subnet show --resource-group $rg --vnet-name $vnetaks --name sn-aks --query id -o tsv)
+echo $SUBNET_ID
+
+# Create Managed Identity
+# This will be the identity assigned to the AKS cluster.
+az identity create --name $managedidentity -g $rg
+az identity list -g $rg
+
+# Save the principal ID in a variable
+principal_id=$(az identity list --resource-group $rg --query '[0].principalId' -o tsv)
+echo $principal_id
+
+# Save the id of the managed identity in a variable
+identity_id=$(az identity list --resource-group $rg --query "[?name=='$managedidentity'].id" -o tsv)
+echo $identity_id
+
+# Existing Application gateway subnet
+#
+APP_GW_SUBNET_ID=$(az network vnet subnet show -g $rg --vnet-name $vnetaks --name sn-agic --query id -o tsv)
+echo $APP_GW_SUBNET_ID
+APP_GW_NAME="agic-aks"
+
+# The command assigns the "Network Contributor" role to the specified principal within the scope of the specified Virtual Network. 
+# This grants the principal permissions to manage network resources within that VNet.
+az role assignment create --assignee $principal_id --scope $VNET_ID --role "Network Contributor"
+az role assignment list --assignee $principal_id --scope $VNET_ID --role "Network Contributor"
+
+# Create ACR 
+az acr create --resource-group $rg --name $myacr --sku Basic --location $region1
+
+# Application Gateway (create new appliication gateway in existing subnet - myApplicationGateway
+# Note it takes time to reflect deployment in portal
+#
+    az aks create \
+    -g $rg \
+    --name $aksclustername \
+    --node-count 1 \
+    --generate-ssh-keys \
+    --enable-addons monitoring,ingress-appgw \
+    --dns-name-prefix $aksdnsprefix \
+    --network-plugin $networkplugin \
+    --service-cidr 10.50.0.0/24 \
+    --dns-service-ip 10.50.0.10 \
+    --vnet-subnet-id $SUBNET_ID \
+    --assign-identity $identity_id \
+    --attach-acr $acrname \
+    --max-pods 30 \
+    --enable-managed-identity \
+    --appgw-name $APP_GW_NAME --appgw-subnet-id $APP_GW_SUBNET_ID \
+    --node-resource-group $nodesrg \
+    --node-vm-size Standard_DS2_v2 \
+    --verbose
+
+
+az aks get-credentials -g $rg -n $akscluster
+k get nodes -o wide
+
+az aks show -g $rg --name $akscluster --query networkProfile.networkPlugin
+# cluster FQDN
+k config get-contexts
+az aks show -g $rg --name $akscluster --query "fqdn" -o tsv
+
+#clean up
+az group delete -g $rg --no-wait
+
+
+
+
+
+
+
+
+
+
+#create vm in cx network
+az vm create -n cxvm -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet $sncxvm --vnet-name $vnetcx --admin-username $username --admin-password $password --no-wait --nsg ""
+
+#create vm in aks vnet
+az vm create -n aksvm -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet $snaksvm --vnet-name $vnetaks --admin-username $username --admin-password $password --no-wait --nsg ""
+
+
+az network nsg create --resource-group $rg --name default-nsg-$region1 --location $region1 -o none
+
+echo Add my home public IP to NSG for SSH acess
+az network nsg rule create -g $rg --nsg-name default-nsg-$region1 -n 'default-allow-ssh' --direction Inbound --priority 100 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow inbound SSH" --output none
+
+
+echo Associate NSG to the VNET subnets both Spokes and Branches
+az network vnet subnet update --id $(az network vnet list -g $rg --query '[?location==`'$region1'`].{id:subnets[0].id}' -o tsv) --network-security-group default-nsg-$region1 -o none
+
+nettoolsuri="https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh"
+for vm in `az vm list -g $rg --query "[?storageProfile.imageReference.offer=='0001-com-ubuntu-server-jammy'].name" -o tsv`
+do
+ az vm extension set \
+ --resource-group $rg \
+ --vm-name $vm \
+ --name customScript \
+ --publisher Microsoft.Azure.Extensions \
+ --protected-settings "{\"fileUris\": [\"$nettoolsuri\"],\"commandToExecute\": \"./nettools.sh\"}" \
+ --no-wait
+done
+
+

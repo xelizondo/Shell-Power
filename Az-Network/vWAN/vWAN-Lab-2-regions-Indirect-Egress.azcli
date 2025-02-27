@@ -897,7 +897,7 @@ $firewall | Set-AzFirewall -AsJob
 az network nic show-effective-route-table -g $rg -n spoke1VMVMNic --output table
 
 
-az group delete -g $rg --no-wait
+#az group delete -g $rg --no-wait
 
 
 

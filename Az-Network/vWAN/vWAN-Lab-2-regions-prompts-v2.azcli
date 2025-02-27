@@ -14,7 +14,6 @@ SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
 SubscriptionID="2b73f762-264b-40ac-9ade-a1f95c5b2195" # Shared Services
 SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
 az account set --subscription $SubscriptionID
-vhubregion2=true #create vHub in region2
 region1=eastus2 #set region1
 region2=westus2 #set region2
 rg=lab-vwan #set resource group
@@ -30,10 +29,10 @@ password=""
 
 #Selections
 vhubregion2=false #create vHub in region2
-vhub1VMs=2 #enter 1 or 2 or 3. Must be equal or less than vhub2Spokes
+vhub1VMs=1 #enter 1 or 2 or 3. Must be equal or less than vhub2Spokes
 vhub2VMs=2 #enter 1 or 2 or 3. Must be equal or less than vhub2Spokes
-vhub1Spokes=3 #of spokes to create, enter 1 or 2 or 3
-vhub2Spokes=3 #of spokes to create, enter 1 or 2 or 3
+vhub1Spokes=2 #of spokes to create, enter 1 or 2 or 3
+vhub2Spokes=2 #of spokes to create, enter 1 or 2 or 3
 vhub1firewall=true #enter true or false
 vhub2firewall=true #enter true or false
 firewallLogging=true #enter true or false
@@ -44,7 +43,6 @@ DNSresolverRegion1=false #enter true or false
 DNSresolverRegion2=false #enter true or false
 vhub1CustomRT=2
 vhub2CustomRT=2
-
 
 #Set subscription context
 az account set --subscription $SubscriptionID
@@ -303,8 +301,29 @@ if [ $vhub1p2s  = 'true' ];
         done
     fi
 fi
-########################### P2S section #############################
-
+########################### ExR GW section #############################
+if [ $vhubexrgw  = 'true' ];
+    then
+    echo Creating exrgw...
+    # create expressroute gateway on vhub1
+    az network express-route gateway create -g $rg --name $hub1name-exrgw --virtual-hub $hub1name --location $region1 --min-val 1 --no-wait
+    prState=$(az network express-route gateway show -g $rg -n $hub1name-exrgw --query provisioningState -o tsv)
+    if [[ $prState == 'Failed' ]];
+    then
+        echo VPN Gateway is in fail state. Deleting and rebuilding.
+        az network express-route-gateway delete -n $hub1name-exrgw -g $rg
+        az network express-route gateway create -g $rg --name $hub1name-exrgw --virtual-hub $hub1name --location $region1 --min-val 1 --no-wait
+        sleep 5
+    else
+        prState=''
+        while [[ $prState != 'Succeeded' ]];
+        do
+            prState=$(az network express-route gateway show -g $rg -n $hub1name-exrgw --query provisioningState -o tsv)
+            echo $hub1name-exrgw  "provisioningState="$prState
+            sleep 5
+        done
+    fi
+fi
 ########################### Branches section #############################
 if [ $branch1Enabled  = 'true' ];
     then
@@ -315,7 +334,9 @@ if [ $branch1Enabled  = 'true' ];
     az network vnet subnet create -g $rg --vnet-name $branch1name -n GatewaySubnet --address-prefixes 10.100.100.0/26 --output none
     az network vnet-gateway create -n $branch1name-vpngw --public-ip-addresses $branch1name-vpngw-pip -g $rg --vnet $branch1name --asn 65010 --gateway-type Vpn -l $region1 --sku VpnGw1 --vpn-gateway-generation Generation1 --no-wait 
     az vm create -n branch1VM  -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet main --vnet-name $branch1name --admin-username $username --admin-password $password --nsg "" --no-wait
-    az network vpn-gateway create -n $hub1name-vpngw -g $rg --location $region1 --vhub $hub1name --no-wait
+    
+    
+    az network vpn-gateway create -n $hub1name-vpngw -g $rg --location $region1 --vhub $hub1name --scale-unit 1 --no-wait
     echo Validating Branches VPN Gateways provisioning...
     #Branch1 VPN Gateways provisioning status
     prState=$(az network vnet-gateway show -g $rg -n $branch1name-vpngw --query provisioningState -o tsv)
@@ -460,11 +481,15 @@ az storage account create -n sc$randomIdentifier2 -g $rg -l $region2 --sku Stand
 #Enable boot diagnostics
 stguri1=$(az storage account show -n sc$randomIdentifier1 -g $rg --query primaryEndpoints.blob -o tsv)
 stguri2=$(az storage account show -n sc$randomIdentifier2 -g $rg --query primaryEndpoints.blob -o tsv)
-az vm boot-diagnostics enable --storage $stguri1 --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
-az vm boot-diagnostics enable --storage $stguri2 --ids $(az vm list -g $rg --query '[?location==`'$region2'`].{id:id}' -o tsv) -o none
+#az vm boot-diagnostics enable --storage $stguri1 --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
+#az vm boot-diagnostics enable --storage $stguri2 --ids $(az vm list -g $rg --query '[?location==`'$region2'`].{id:id}' -o tsv) -o none
+
+az vm boot-diagnostics enable --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
+az vm boot-diagnostics enable --ids $(az vm list -g $rg --query '[?location==`'$region2'`].{id:id}' -o tsv) -o none
 ### Install tools for networking connectivity validation such as traceroute, tcptraceroute, iperf and others (check link below for more details) 
 nettoolsuri="https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh"
-for vm in `az vm list -g $rg --query "[?storageProfile.imageReference.offer=='0001-com-ubuntu-server-jammy'].name" -o tsv`
+#az vm list -g $rg --query "[?storageProfile.imageReference.offer=='0001-com-ubuntu-server-jammy'].name" -o tsv
+for vm in `az vm list -g $rg --query "[?contains(storageProfile.imageReference.offer, 'ubuntu')].name" -o tsv`
 do
  az vm extension set \
  --resource-group $rg \
@@ -577,9 +602,127 @@ fi
     --id $(az network vnet show -g $rg -n spoke2 --query id -o tsv) \
     --output none
 
+########################### vHub BGP peering section #############################
+if [ $vhub1peering  = 'true' ];
+    #BGP Region-1 NVA specific variables:
+    vhub1peering=true #enter true or false
+    # Deploy BGP endpoint Region-1 (Make the changes based on your needs)
+    nvavnetnamer1=spknva #Target NET
+    instances=1 #Set number of NVA instaces to be created
+    nvaintname=nvabgp #NVA instance name
+    nvasubnetname=snet-nvabgp-$region1 #Existing Subnet where NVA gets deployed
+    hubtopeer=$hub1name #Note: VNET has to be connected to the same hub
+    nvanames=$(i=1;while [ $i -le $instances ];do echo $nvavnetnamer1-$nvaintname-$i; ((i++));done)
+    echo $nvanames
+
+    #Specific NVA BGP settings
+    asn_frr=65002 # Set ASN
+    bgp_network1="10.10.0.0/16"
+
+    # Creating spoke nvasubnet
+    nvavnetnamer1=$nvavnetnamer1-$region1
+    echo Creating $nvavnetnamer1 ...
+    az network vnet create --address-prefixes 10.10.0.0/24 -n $nvavnetnamer1 -g $rg -l $region1 --subnet-name main --subnet-prefixes 10.10.0.0/27 --output none
+    az network vnet subnet create -g $rg --vnet-name $nvavnetnamer1 -n $nvasubnetname --address-prefixes 10.10.0.32/28  --output none
+    az network vhub connection create -n $nvavnetnamer1-conn --remote-vnet $nvavnetnamer1 -g $rg --vhub-name $hub1name --no-wait
+
+    echo connection status
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vhub connection show -n $nvavnetnamer1-conn --vhub-name $hub1name -g $rg  --query 'provisioningState' -o tsv)
+        echo "vnet connection spoke2conn provisioningState="$prState
+        sleep 5
+    done
 
 
+    # Deploy NVA instances on the target VNET above.
+    for nvaname in $nvanames
+    do
+    # Enable routing, NAT and BGP on Linux NVA:
+    az network public-ip create --name $nvaname-pip --resource-group $rg --location $region1 --sku Standard --output none --only-show-errors
+    az network nic create --name $nvaname-nic --resource-group $rg --subnet $nvasubnetname --vnet $nvavnetnamer1 --public-ip-address $nvaname-pip --ip-forwarding true --location $region1 -o none
+    az vm create --resource-group $rg --location $region1 --name $nvaname --size $vmsize --nics $nvaname-nic  --image Ubuntu2204 --admin-username $username --admin-password $password -o none --only-show-errors
 
+    #NVA BGP config variables (do not change)
+    bgp_routerId=$(az network nic show --name $nvaname-nic --resource-group $rg --query ipConfigurations[0].privateIPAddress -o tsv)
+    routeserver_IP1=$(az network vhub show -n $hubtopeer -g $rg --query virtualRouterIps[0] -o tsv)
+    routeserver_IP2=$(az network vhub show -n $hubtopeer -g $rg --query virtualRouterIps[1] -o tsv)
+
+    # Enable routing and NAT on Linux NVA:
+    scripturi="https://raw.githubusercontent.com/dmauser/AzureVM-Router/master/scripts/linuxrouterbgpfrr.sh"
+    az vm extension set --resource-group $rg --vm-name $nvaname  --name customScript --publisher Microsoft.Azure.Extensions \
+    --protected-settings "{\"fileUris\": [\"$scripturi\"],\"commandToExecute\": \"./linuxrouterbgpfrr.sh $asn_frr $bgp_routerId $bgp_network1 $routeserver_IP1 $routeserver_IP2\"}" \
+    --no-wait
+
+    # Build Virtual Router BGP Peering
+    az network vhub bgpconnection create --resource-group $rg \
+    --vhub-name $hubtopeer \
+    --name $nvaname \
+    --peer-asn $asn_frr \
+    --peer-ip $(az network nic show --name $nvaname-nic --resource-group $rg --query ipConfigurations[0].privateIPAddress -o tsv) \
+    --vhub-conn $(az network vhub connection show --name $nvavnetnamer1-conn --resource-group $rg --vhub-name $hubtopeer --query id -o tsv) \
+    --output none
+    done
+fi
+
+########################### vHub region 1 SD-WAN peering section #############################
+if [ $vhub1sdwanpeering  = 'true' ];
+    #BGP Region-1 NVA specific variables:
+    vhub1sdwanpeering=true #enter true or false
+    # Deploy BGP endpoint Region-1 (Make the changes based on your needs)
+    nvavnetnamer1=spknva #Target NET
+    nvaintname=nvabgp #NVA instance name
+    nvasubnetname1=snet-untrusted-nvabgp-$region1 #Existing Subnet where NVA gets deployed
+    nvasubnetname2=snet-trusted-nvabgp-$region1 #Existing Subnet where NVA gets deployed
+    hubtopeer=$hub1name #Note: VNET has to be connected to the same hub
+
+    # Creating spoke nvasubnet
+    nvavnetnamer1=$nvavnetnamer1-$region1
+    echo Creating $nvavnetnamer1 ...
+    az network vnet create --address-prefixes 10.10.0.0/24 -n $nvavnetnamer1 -g $rg -l $region1 --subnet-name $nvasubnetname1 --subnet-prefixes 10.10.0.0/28 --output none
+    az network vnet subnet create -g $rg --vnet-name $nvavnetnamer1 -n $nvasubnetname2 --address-prefixes 10.10.0.16/28  --output none
+    az network vhub connection create -n $nvavnetnamer1-conn --remote-vnet $nvavnetnamer1 -g $rg --vhub-name $hub1name --no-wait
+
+    echo connection status
+    prState=''
+    while [[ $prState != 'Succeeded' ]];
+    do
+        prState=$(az network vhub connection show -n $nvavnetnamer1-conn --vhub-name $hub1name -g $rg  --query 'provisioningState' -o tsv)
+        echo "vnet connection spoke2conn provisioningState="$prState
+        sleep 5
+    done
+
+
+    # Deploy NVA instances on the target VNET above.
+    for nvaname in $nvanames
+    do
+    # Enable routing, NAT and BGP on Linux NVA:
+    az network public-ip create --name $nvaname-pip --resource-group $rg --location $region1 --sku Standard --output none --only-show-errors
+    az network nic create --name $nvaname-nic --resource-group $rg --subnet $nvasubnetname --vnet $nvavnetnamer1 --public-ip-address $nvaname-pip --ip-forwarding true --location $region1 -o none
+    az vm create --resource-group $rg --location $region1 --name $nvaname --size $vmsize --nics $nvaname-nic  --image Ubuntu2204 --admin-username $username --admin-password $password -o none --only-show-errors
+
+    #NVA BGP config variables (do not change)
+    bgp_routerId=$(az network nic show --name $nvaname-nic --resource-group $rg --query ipConfigurations[0].privateIPAddress -o tsv)
+    routeserver_IP1=$(az network vhub show -n $hubtopeer -g $rg --query virtualRouterIps[0] -o tsv)
+    routeserver_IP2=$(az network vhub show -n $hubtopeer -g $rg --query virtualRouterIps[1] -o tsv)
+
+    # Enable routing and NAT on Linux NVA:
+    scripturi="https://raw.githubusercontent.com/dmauser/AzureVM-Router/master/scripts/linuxrouterbgpfrr.sh"
+    az vm extension set --resource-group $rg --vm-name $nvaname  --name customScript --publisher Microsoft.Azure.Extensions \
+    --protected-settings "{\"fileUris\": [\"$scripturi\"],\"commandToExecute\": \"./linuxrouterbgpfrr.sh $asn_frr $bgp_routerId $bgp_network1 $routeserver_IP1 $routeserver_IP2\"}" \
+    --no-wait
+
+    # Build Virtual Router BGP Peering
+    az network vhub bgpconnection create --resource-group $rg \
+    --vhub-name $hubtopeer \
+    --name $nvaname \
+    --peer-asn $asn_frr \
+    --peer-ip $(az network nic show --name $nvaname-nic --resource-group $rg --query ipConfigurations[0].privateIPAddress -o tsv) \
+    --vhub-conn $(az network vhub connection show --name $nvavnetnamer1-conn --resource-group $rg --vhub-name $hubtopeer --query id -o tsv) \
+    --output none
+    done
+fi
 
 
 #az group delete -g $rg --no-wait
@@ -609,3 +752,7 @@ az network vnet-gateway list-bgp-peer-status -g $rg -n branch1-eastus2-vpngw -o 
 
 
 
+az network vhub routing-intent list -g $rg --vhub $hub1name
+az network vhub routing-intent show -g $rg --vhub $hub1name --name hubRoutingIntent \
+--query "{name:name, routingPolicies:routingPolicies}" \
+--output json > vwan_routing_intent_backup.json
