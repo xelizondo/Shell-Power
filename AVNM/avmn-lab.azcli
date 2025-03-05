@@ -1,135 +1,269 @@
 ################################################
 az config set extension.use_dynamic_install=yes_without_prompt
+az extension add -n virtual-network-manager
+
 region1=eastus
 region2=westus
-rg=lab-vwan-intra
-avnmname=avmn-$region1
+rg=lab-avnm
+avnmname="netman1"
 SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"
-netgroup1=$region1-prod-vnets
-netgroup2=$region1-nonprod-vnets
-netgroup3=$region2-prod-vnets
-netgroup4=$region2-nonprod-vnets
+netgroup_prod_region1=netgroup-prod-$region1-vnets
+netgroup_dev_region1=netgroup-dev-$region1-vnets
+netgroup_prod_region2=netgroup-prod-$region2-vnets
+netgroup_dev_region2=netgroup-dev-$region2-vnets
 
+vmsize=Standard_B2s
+password=""
+username=az-admin
+
+echo $avnmname
+echo $region1 
+echo $region2
+echo $rg
+echo $avnmname
+echo $SubscriptionID
+echo $netgroup_prod_region1
+echo $netgroup_dev_region1
+echo $netgroup_prod_region2
+echo $netgroup_dev_region2
 az account set --subscription $SubscriptionID
 
 az group create -n $rg -l $region1 --output none
+
+#create network manager with scope to a management group called mgmt-group-1
+az network manager create --location $region1 --resource-group $rg \
+    --name $avnmname \
+    --network-manager-scopes management-groups="/providers/Microsoft.Management/managementGroups/mgmt-group-1" \
+    --scope-accesses "SecurityAdmin" "Connectivity" "Routing" \
+    --description $rg
+
 az network manager create --location $region1 --resource-group $rg \
     --name $avnmname \
     --network-manager-scopes subscriptions="/subscriptions/$(az account list --query "[?isDefault == \`true\`].id" --all -o tsv)" \
-    --scope-accesses "SecurityAdmin" "Connectivity" \
-    --description $rg
+    --scope-accesses "SecurityAdmin" "Connectivity" "Routing" \
+    --description $rg \
     --output none
 
-az network manager group create --name $netgroup1 --network-manager-name $avnmname --resource-group $rg \
-    --description $netgroup1 \
+#Create VNETs 
+
+az network vnet create --name vnet-hub-prod-$region1 --resource-group $rg --location $region1 --address-prefix "172.16.1.0/24" --subnet-name GatewaySubnet --subnet-prefix 172.16.1.0/27 --tags "NetworkType=Prod" --output none
+az network vnet subnet create --name RouteServerSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region1 --address-prefix 172.16.1.32/27 --output none
+az network vnet subnet create --name AzureBastionSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region1 --address-prefix 172.16.1.64/27 --output none
+az network vnet subnet create --name AzureFirewallSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region1 --address-prefix 172.16.1.96/27 --output none
+az network vnet subnet create --name snet-hub-prod-$region1 --resource-group $rg --vnet-name vnet-hub-prod-$region1 --address-prefix 172.16.1.128/27 --output none
+
+az network vnet create --name vnet-hub-prod-$region2 --resource-group $rg --location $region2 --address-prefix "172.16.3.0/24" --subnet-name GatewaySubnet --subnet-prefix 172.16.3.0/27 --tags "NetworkType=Prod" --output none
+az network vnet subnet create --name RouteServerSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region2 --address-prefix 172.16.3.32/27 --output none
+az network vnet subnet create --name AzureBastionSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region2 --address-prefix 172.16.3.64/27 --output none
+az network vnet subnet create --name AzureFirewallSubnet --resource-group $rg --vnet-name vnet-hub-prod-$region2 --address-prefix 172.16.3.96/27 --output none
+az network vnet subnet create --name snet-hub-prod-$region2 --resource-group $rg --vnet-name vnet-hub-prod-$region2 --address-prefix 172.16.3.128/27 --output none
+
+
+az network vnet create --name vnet-app1-prod-$region1 --resource-group $rg --location $region1 --address-prefix "10.1.0.0/16" --subnet-name snet-app1-prod-$region1 --subnet-prefix 10.1.0.0/27 --tags "NetworkType=Prod" --output none
+az network vnet create --name vnet-app2-prod-$region1 --resource-group $rg --location $region1 --address-prefix "10.2.0.0/16" --subnet-name snet-app2-prod-$region1 --subnet-prefix 10.2.0.0/27 --tags "NetworkType=Prod" --output none
+az network vnet create --name vnet-app3-dev-$region1 --resource-group $rg --location $region1 --address-prefix "10.3.0.0/16" --subnet-name snet-app3-dev-$region1 --subnet-prefix 10.3.0.0/27 --tags "NetworkType=Dev" --output none
+az network vnet create --name vnet-app4-dev-$region1 --resource-group $rg --location $region1 --address-prefix "10.4.0.0/16" --subnet-name snet-app4-dev-$region1 --subnet-prefix 10.4.0.0/27 --tags "NetworkType=Dev" --output none
+az network vnet create --name vnet-app5-prod-$region2 --resource-group $rg --location $region2 --address-prefix "10.5.0.0/16" --subnet-name snet-app5-prod-$region2 --subnet-prefix 10.5.0.0/27 --tags "NetworkType=Prod" --output none
+az network vnet create --name vnet-app6-prod-$region2 --resource-group $rg --location $region2 --address-prefix "10.6.0.0/16" --subnet-name snet-app6-prod-$region2 --subnet-prefix 10.6.0.0/27 --tags "NetworkType=Prod" --output none
+az network vnet create --name vnet-app7-dev-$region2 --resource-group $rg --location $region2 --address-prefix "10.7.0.0/16" --subnet-name snet-app7-dev-$region2 --subnet-prefix 10.7.0.0/27 --tags "NetworkType=Dev" --output none
+az network vnet create --name vnet-app8-dev-$region2 --resource-group $rg --location $region2 --address-prefix "10.8.0.0/16" --subnet-name snet-app8-dev-$region2 --subnet-prefix 10.8.0.0/27 --tags "NetworkType=Dev" --output none
+
+
+#create network groups
+
+az network manager group create --name $netgroup_prod_region1 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup_prod_region1 \
+    --output none
+az network manager group create --name $netgroup_dev_region1 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup_dev_region1 \
+    --output none
+az network manager group create --name $netgroup_prod_region2 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup_prod_region2 \
+    --output none
+az network manager group create --name $netgroup_dev_region2 --network-manager-name $avnmname --resource-group $rg \
+    --description $netgroup_dev_region2 \
     --output none
 
-az network manager group create --name $netgroup2 --network-manager-name $avnmname --resource-group $rg \
-    --description $netgroup2 \
+az network manager group create --name netgroup-hubs-global --network-manager-name $avnmname --resource-group $rg \
+    --description netgroup-hubs-global \
     --output none
 
-az network manager group create --name $netgroup3 --network-manager-name $avnmname --resource-group $rg \
-    --description $netgroup3 \
+az network manager group create --name netgroup-prod-hub-$region1-snets --network-manager-name $avnmname --resource-group $rg \
+    --description netgroup-hubs-global \
+    --output none
+az network manager group create --name netgroup-prod-hub-$region2-snets --network-manager-name $avnmname --resource-group $rg \
+    --description netgroup-hubs-global \
     --output none
 
-az network manager group create --name $netgroup4 --network-manager-name $avnmname --resource-group $rg \
-    --description $netgroup4 \
-    --output none
+#Create static memberships to network groups 
+az network manager group static-member create --name "vnet-app1-prod-$region1" --network-group $netgroup_prod_region1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app1-prod-$region1'].id" -o tsv)
+az network manager group static-member create --name "vnet-app2-prod-$region1" --network-group $netgroup_prod_region1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app2-prod-$region1'].id" -o tsv)
+az network manager group static-member create --name "vnet-app3-dev-$region1" --network-group $netgroup_dev_region1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app3-dev-$region1'].id" -o tsv) 
+az network manager group static-member create --name "vnet-app4-dev-$region1" --network-group $netgroup_dev_region1 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app4-dev-$region1'].id" -o tsv)
 
-az network vnet create --name "VNetA" --resource-group $rg --location $region1 --address-prefix "10.1.0.0/16" --tags "NetworkType=NonProd" --output none
-az network vnet create --name "VNetB" --resource-group $rg --location $region1 --address-prefix "10.2.0.0/16" --tags "NetworkType=NonProd" --output none
-az network vnet create --name "VNetC" --resource-group $rg --location $region1 --address-prefix "10.3.0.0/16" --tags "NetworkType=Prod" --output none
-az network vnet create --name "VNetD" --resource-group $rg --location $region1 --address-prefix "10.4.0.0/16" --tags "NetworkType=Prod" --output none
-az network vnet create --name "VNetE" --resource-group $rg --location $region2 --address-prefix "10.7.0.0/16" --tags "NetworkType=NonProd" --output none
-az network vnet create --name "VNetF" --resource-group $rg --location $region2 --address-prefix "10.8.0.0/16" --tags "NetworkType=NonProd" --output none
-az network vnet create --name "VNetG" --resource-group $rg --location $region2 --address-prefix "10.9.0.0/16" --tags "NetworkType=Prod" --output none
-az network vnet create --name "VNetH" --resource-group $rg --location $region2 --address-prefix "10.10.0.0/16" --tags "NetworkType=Prod" --output none
+az network manager group static-member create --name "vnet-app5-prod-$region2" --network-group $netgroup_prod_region2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app5-prod-$region2'].id" -o tsv)
+az network manager group static-member create --name "vnet-app6-prod-$region2" --network-group $netgroup_prod_region2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app6-prod-$region2'].id" -o tsv)
+az network manager group static-member create --name "vnet-app7-dev-$region2" --network-group $netgroup_dev_region2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app7-dev-$region2'].id" -o tsv)
+az network manager group static-member create --name "vnet-app8-dev-$region2" --network-group $netgroup_dev_region2 --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-app8-dev-$region2'].id" -o tsv)
 
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetA" --address-prefix "10.1.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetB" --address-prefix "10.2.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetC" --address-prefix "10.3.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetD" --address-prefix "10.4.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetE" --address-prefix "10.7.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetF" --address-prefix "10.8.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetG" --address-prefix "10.9.0.0/27" --output none
-az network vnet subnet create --name "GatewaySubnet" --resource-group $rg --vnet-name "VNetH" --address-prefix "10.10.0.0/27" --output none
+## Set up the hub VNETs as static members of the global network group
+az network manager group static-member create --name "vnet-hub-prod-$region1" --network-group netgroup-prod-hub-$region1-snets --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-hub-prod-$region1'].id" -o tsv)
+az network manager group static-member create --name "vnet-hub-prod-$region2" --network-group netgroup-prod-hub-$region2-snets --network-manager $avnmname --resource-group $rg --output none \
+    --resource-id $(az network vnet list -g $rg --query "[?name=='vnet-hub-prod-$region2'].id" -o tsv)
 
-az network manager group static-member create --name "VNetA" --network-group $netgroup2 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetA'].id" -o tsv)
 
-az network manager group static-member create --name "VNetB" --network-group $netgroup2 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetB'].id" -o tsv)
+#Create connectivity network manager configurations
+
+#not working
+az network manager connect-config create --configuration-name "myTestConnectivityConfig" --network-manager-name $avnmname --resource-group $rg --applies-to-group group-connectivity="None" is-global=false network-group-id="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-eastus-vnets" use-hub-gateway=false --connectivity-topology "HubAndSpoke" --delete-existing-peering false --hub resource-id="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/virtualNetworks/vnet-hub-prod-eastus"
+az network manager connect-config create --network-manager-name $avnmname -g $rg --configuration-name "Hub" --description "Hub and Spoke for $region1" \
+    --connectivity-topology "HubAndSpoke"  \
+    --hub resource-id="/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/virtualNetworks/vnet-hub-prod-eastus" \
+    --applies-to-groups '[{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-eastus-vnets","groupConnectivity": "DirectlyConnected","useHubGateway": "False","isGlobal": "False"},{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-dev-eastus-vnets","groupConnectivity": "DirectlyConnected","useHubGateway": "False","isGlobal": "False"}]'
     
-az network manager group static-member create --name "VNetC" --network-group $netgroup1 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetC'].id" -o tsv) 
+    --applies-to-groups '[{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-eastus-vnets", "groupConnectivity": "None"},{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-eastus-vnets", "groupConnectivity": "None"}]'
+    --hub resource-id="$(az network vnet show --name vnet-hub-prod-$region1 --resource-group $rg --query id -o tsv)" \
 
-az network manager group static-member create --name "VNetD" --network-group $netgroup1 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetD'].id" -o tsv)
-
-az network manager group static-member create --name "VNetE" --network-group $netgroup4 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetE'].id" -o tsv)
-
-az network manager group static-member create --name "VNetF" --network-group $netgroup4 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetF'].id" -o tsv)
-
-az network manager group static-member create --name "VNetG" --network-group $netgroup3 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetG'].id" -o tsv)
-
-az network manager group static-member create --name "VNetH" --network-group $netgroup3 --network-manager $avnmname --resource-group $rg --output none \
-    --resource-id $(az network vnet list -g $rg --query "[?name=='VNetH'].id" -o tsv)
-
-az network manager connect-config create --configuration-name "Mesh-Prod" --description "Production Mesh Connectivity" --is-global true \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup1 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup3 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+az network manager connect-config create --network-manager-name $avnmname -g $rg --configuration-name "Mesh-Global-Dev-Spoke-vNets" --description "Dev vNets are meshed globally" \
+    --is-global true \
     --connectivity-topology "Mesh" \
-    --network-manager-name $avnmname \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name $netgroup_dev_region1 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"},{"networkGroupId": "'$(az network manager group show --name $netgroup_dev_region2 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+    #--applies-to-groups '[{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-dev-eastus-vnets", "groupConnectivity": "None"},{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-dev-westus-vnets", "groupConnectivity": "None"}]'
+az network manager connect-config create --network-manager-name $avnmname -g $rg --configuration-name "Mesh-Global-Prod-Spoke-vNets" --description "Production vNets are meshed globally" \
+    --is-global true \
+    --connectivity-topology "Mesh" \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name $netgroup_prod_region1 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"},{"networkGroupId": "'$(az network manager group show --name $netgroup_prod_region2 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+    #--applies-to-groups '[{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-eastus-vnets", "groupConnectivity": "None"},{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-prod-westus-vnets", "groupConnectivity": "None"}]'
+az network manager connect-config create --network-manager-name $avnmname -g $rg --configuration-name "Mesh-Global-Hubs" --description "Hubs are meshed globally" \
+    --is-global true \
+    --connectivity-topology "Mesh" \
+    --applies-to-groups '[{"networkGroupId": "'$(az network manager group show --name netgroup-hubs-global --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+    #--applies-to-groups '[{"networkGroupId": "/subscriptions/af3717f4-48d1-42d5-8b79-453a28496737/resourceGroups/lab-avnm/providers/Microsoft.Network/networkManagers/netman1/networkGroups/netgroup-hubs-global", "groupConnectivity": "None"}]'
+#Create network manager Routing configurations
+az network manager routing-config create --config-name "Routing-$region1" --description "Routing configuration for $region1" \
+    --manager-name $avnmname \
     --resource-group $rg \
     --output none
 
-az network manager connect-config create --configuration-name "Mesh-NonProd" --description "Non-Production Mesh Connectivity" --is-global true \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup2 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup4 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
-    --connectivity-topology "Mesh" \
-    --network-manager-name $avnmname \
+az network manager routing-config create --config-name "Routing-$region2" --description "Routing configuration for $region2" \
+    --manager-name $avnmname \
     --resource-group $rg \
     --output none
-## Create a Security Admin Rule
+
+#Create Rule Collections
+az network manager routing-config rule-collection create -g $rg --name "RoutingRuleCollection-$region1" --config-name "Routing-$region1" \
+    --manager-name $avnmname \
+    --disable-bgp-route false \
+    --output none \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name $netgroup_prod_region1 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"},{"networkGroupId": "'$(az network manager group show --name $netgroup_dev_region1 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+az network manager routing-config rule-collection create -g $rg --name "RoutingRuleCollection-$region2" --config-name "Routing-$region2" \
+    --manager-name $avnmname \
+    --disable-bgp-route false \
+    --output none \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name $netgroup_prod_region2 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"},{"networkGroupId": "'$(az network manager group show --name $netgroup_dev_region2 --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+    
+
+az network manager routing-config rule-collection create -g $rg --name "RoutingRuleCollection-Hub-$region1-2-$region2" --config-name "Routing-$region1" \
+    --manager-name $avnmname \
+    --disable-bgp-route false \
+    --output none \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name netgroup-prod-hub-$region1-snets --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+az network manager routing-config rule-collection create -g $rg --name "RoutingRuleCollection-Hub-$region2-2-$region1" --config-name "Routing-$region2" \
+    --manager-name $avnmname \
+    --disable-bgp-route false \
+    --output none \
+    --applies-to '[{"networkGroupId": "'$(az network manager group show --name netgroup-prod-hub-$region2-snets --network-manager $avnmname --resource-group $rg --query id -o tsv)'"}]'
+    
+#Create Rules in Routing Rule Collections
+#create routing rule destination address 0.0.0.0/0 next hop virtual appliance 172.16.3.4
+#NOT WORKING 
+az network manager routing-config rule-collection rule create -g $rg --config-name Routing-$region1 --manager-name $avnmname \
+    --collection-name RoutingRuleCollection-$region1 --name RoutingRule-$region1 \
+    --destination {"destination_address":"
+
+az network manager routing-config rule-collection rule create -g $rg --config-name Routing-$region1 --manager-name $avnmname \
+    --collection-name RoutingRuleCollection-$region1 --name RoutingRule-$region1 \
+    --destination {"destination_address":"10.0.0.0/16","type":"AddressPrefix"} \
+    --next-hop {"next_hop_type":"VirtualAppliance","ip_address":"172.16.3.4"} 
+    
+az network manager routing-config rule-collection rule create --config-name Routing-$region1 --manager-name $avnmname \
+    --collection-name RoutingRuleCollection-$region1 --name TestNetworkManagerRule --resource-group $rg \
+    --next-hop {"next_hop_type":"VirtualNetworkGateway"} --destination {"destinationAddress":"0.0.0.0/0","type":"AddressPrefix"}
+    
+
+## Create a Security Admin Rule Configuration
 az network manager security-admin-config create --resource-group $rg --configuration-name "security-config-1" --network-manager-name $avnmname \
-    --description "My Security Config 1" --apply-on none
+    --description "My Security Config 1" --aggregation manual --apply-on ["AllowRulesOnly"] --output none 
 ## Create a rule collection under the Security Admin Rule
 az network manager security-admin-config rule-collection create --resource-group $rg --network-manager-name $avnmname \
     --configuration-name "security-config-1" --rule-collection-name "RuleCollection1" --description "Rule Collection 1" \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup1 \
-    --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)"
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_prod_region1 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_prod_region2 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_dev_region1 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_dev_region2 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --output none
 az network manager security-admin-config rule-collection create --resource-group $rg --network-manager-name $avnmname \
     --configuration-name "security-config-1" --rule-collection-name "RuleCollection2" --description "Rule Collection 2" \
-    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup2 \
-    --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)"
-## Create a rule under the rule collection 
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_prod_region1 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --applies-to-groups network-group-id="$(az network manager group show --name $netgroup_prod_region2 --network-manager-name $avnmname  --resource-group $rg --query id -o tsv)" \
+    --output none
+
+## Create rules under the rule collection 
 az network manager security-admin-config rule-collection rule create --resource-group $rg --configuration-name "security-config-1" \
-    --network-manager-name $avnmname --rule-collection-name "RuleCollection1" --rule-name "RuleCollection1-Rule2" --kind "Custom" \
-    --protocol "Tcp" --access "Allow" --priority 33 --direction "Inbound" \
+    --network-manager-name $avnmname --rule-collection-name "RuleCollection1" --rule-name "RuleCollection1-Rule1" --kind "Custom" \
+    --protocol "Udp" --access "AlwaysAllow" --priority 30 --direction "Outbound" \
+    --description "Always Allow DNS resolution" \
+    --sources address-prefix="192.168.0.0/24" address-prefix-type="IPPrefix" \
+    --sources address-prefix="192.168.1.0/24" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.10.11/32" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.11.12/32" address-prefix-type="IPPrefix" \
+    --dest-port-ranges 53 --output none
+az network manager security-admin-config rule-collection rule create --resource-group $rg --configuration-name "security-config-1" \
+    --network-manager-name $avnmname --rule-collection-name "RuleCollection2" --rule-name "RuleCollection2-Rule1" --kind "Custom" \
+    --protocol "Tcp" --access "Allow" --priority 33 --direction "Outbound" \
+    --description "Allow SSH from Prod to Dev Vnets" \
     --sources address-prefix="192.168.0.0/24" address-prefix-type="IPPrefix" \
     --sources address-prefix="192.168.1.0/24" address-prefix-type="IPPrefix" \
     --destinations address-prefix="172.16.10.0/24" address-prefix-type="IPPrefix" \
     --destinations address-prefix="172.16.11.0/24" address-prefix-type="IPPrefix" \
-    --dest-port-ranges 22
+    --dest-port-ranges 22 --output none
+az network manager security-admin-config rule-collection rule create --resource-group $rg --configuration-name "security-config-1" \
+    --network-manager-name $avnmname --rule-collection-name "RuleCollection2" --rule-name "RuleCollection2-Rule2" --kind "Custom" \
+    --protocol "Any" --access "Deny" --priority 34 --direction "Inbound" \
+    --description "Deny from Dev to Prod Vnets" \
+    --sources address-prefix="0.0.0.0/0" address-prefix-type="IPPrefix" \
+    --destinations address-prefix="172.16.11.0/24" address-prefix-type="IPPrefix" \
+    --dest-port-ranges 0-65535 --output none
+    
 ## Deploy the connectivity configuration
+#Mesh Global Prod and Dev Spoke vNets
 az network manager post-commit --network-manager-name $avnmname --commit-type "Connectivity" --resource-group $rg --target-locations $region1 $region2 \
-    --configuration-ids $(az network manager connect-config show --configuration-name "Mesh-Prod" --network-manager-name $avnmname --resource-group $rg --query id -o tsv) $(az network manager connect-config show --configuration-name "Mesh-NonProd" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
+    --configuration-ids $(az network manager connect-config show --configuration-name "Mesh-Global-Prod-Spoke-vNets" --network-manager-name $avnmname --resource-group $rg --query id -o tsv) $(az network manager connect-config show --configuration-name "Mesh-Global-Dev-Spoke-vNets" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
+## Deploy the routing configuration
+az network manager post-commit --network-manager-name $avnmname --commit-type "Routing" --resource-group $rg --target-locations $region1 $region2 \
+    --configuration-ids $(az network manager connect-config show --configuration-name Routing-$region1 --network-manager-name $avnmname --resource-group $rg --query id -o tsv) $(az network manager connect-config show --configuration-name "Routing-$region2" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
 ## Deploy the security admin configuration
 az network manager post-commit --network-manager-name $avnmname --commit-type "SecurityAdmin" --resource-group $rg --target-locations $region1 $region2 \
     --configuration-ids $(az network manager security-admin-config show --configuration-name "security-config-1" --network-manager-name $avnmname --resource-group $rg --query id -o tsv)
      
 ## Review effect connectivity on each VNet
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetA"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetB"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetC"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetD"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetE"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetF"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetG"
-az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "VNetH"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name vnet-app1-prod-$region1
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name vnet-app2-prod-$region1
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name vnet-app3-dev-$region1
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "vnet-app4-dev-$region1"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "vnet-app5-prod-$region2"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "vnet-app6-prod-$region2"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "vnet-app7-dev-$region2"
+az network manager list-effective-connectivity-config --resource-group $rg --virtual-network-name "vnet-app8-dev-$region2"
 
 
 ## When done clean up the lab by deleting the resource group and all resources in it
@@ -146,6 +280,22 @@ az network manager security-admin-config rule-collection rule create --resource-
     --sources address-prefix="192.168.1.0/24" address-prefix-type="IPPrefix" \
     --destinations address-prefix="172.16.10.0/24" address-prefix-type="IPPrefix" \
     --destinations address-prefix="172.16.11.0/24" address-prefix-type="IPPrefix" \
-    --dest-port-ranges 22 --output none
+    --dest-port-ranges 20-23 --output none
 done
 
+
+
+
+
+az vm create -n VM-hub-prod-$region1 -g $rg --image Ubuntu2204 --size $vmsize -l $region1 --subnet snet-hub-prod-$region1 --vnet-name vnet-hub-prod-$region1 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+az vm create -n VM-hub-prod-$region2 -g $rg --image Ubuntu2204 --size $vmsize -l $region2 --subnet snet-hub-prod-$region2 --vnet-name vnet-hub-prod-$region2 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+
+az vm create -n VM-app1-prod-$region1 -g $rg --image Ubuntu2204 --size $vmsize -l $region1 --subnet snet-app1-prod-$region1 --vnet-name vnet-app1-prod-$region1 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+az vm create -n VM-app2-prod-$region1 -g $rg --image Ubuntu2204 --size $vmsize -l $region1 --subnet snet-app2-prod-$region1 --vnet-name vnet-app2-prod-$region1 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+az vm create -n VM-app3-dev-$region1 -g $rg --image Ubuntu2204 --size $vmsize -l $region1 --subnet snet-app3-dev-$region1 --vnet-name vnet-app3-dev-$region1 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Dev"
+az vm create -n VM-app4-dev-$region1 -g $rg --image Ubuntu2204 --size $vmsize -l $region1 --subnet snet-app4-dev-$region1 --vnet-name vnet-app4-dev-$region1 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Dev"
+
+az vm create -n VM-app5-prod-$region2 -g $rg --image Ubuntu2204 --size $vmsize -l $region2 --subnet snet-app5-prod-$region2 --vnet-name vnet-app5-prod-$region2 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+az vm create -n VM-app6-prod-$region2 -g $rg --image Ubuntu2204 --size $vmsize -l $region2 --subnet snet-app6-prod-$region2 --vnet-name vnet-app6-prod-$region2 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Prod"
+az vm create -n VM-app7-dev-$region2 -g $rg --image Ubuntu2204 --size $vmsize -l $region2 --subnet snet-app7-dev-$region2 --vnet-name vnet-app7-dev-$region2 --admin-username $username --admin-password $password --no-wait --nsg "" --tags "NetworkType=Dev"
+az vm create -n VM-app8-dev-$region2 -g $rg --image Ubuntu2204 --size $vmsize -l $region2 --subnet snet-app8-dev-$region2 --vnet-name vnet-app8-dev-$region2 --admin-username $username --admin-password $password --no-wait --nsg ""--tags "NetworkType=Dev"
