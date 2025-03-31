@@ -1,0 +1,67 @@
+"customRules": {
+    "rules": [
+        {
+            "name": "BlockNonUS",
+            "enabledState": "Enabled",
+            "priority": 100,
+            "ruleType": "MatchRule",
+            "rateLimitDurationInMinutes": 1,
+            "rateLimitThreshold": 100,
+            "matchConditions": [
+                {
+                    "matchVariable": "RemoteAddr",
+                    "selector": null,
+                    "operator": "GeoMatch",
+                    "negateCondition": true,
+                    "matchValue": [
+                        "US"
+                    ],
+                    "transforms": []
+                }
+            ],
+            "action": "Block",
+            "groupBy": []
+        }
+    ]
+}, 	        
+            
+            {
+                "name": "BlockRestrictedURIs",
+                "priority": 10,
+                "ruleType": "MatchRule",
+                "action": "Block",
+                "matchConditions": [
+                    {
+                        "matchVariables": [
+                            {
+                                "variableName": "RequestUri"
+                            }
+                        ],
+                        "operator": "Contains",
+                        "negationConditon": false,
+                        "matchValues": [
+                            "/appname/proxy/",
+                            "/appname/api/"
+                        ],
+                        "transforms": []
+                    },
+                    {
+                        "matchVariables": [
+                            {
+                                "variableName": "RequestUri"
+                            }
+                        ],
+                        "operator": "EndsWith",
+                        "negationConditon": false,
+                        "matchValues": [
+                            ".jsp",
+                            ".exe",
+                            ".bat",
+                            ".sh"
+                        ],
+                        "transforms": []
+                    }
+                ],
+                "skippedManagedRuleSets": [],
+                "state": "Enabled"
+            }

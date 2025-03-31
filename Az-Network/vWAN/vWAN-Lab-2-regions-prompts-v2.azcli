@@ -14,10 +14,12 @@ SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
 SubscriptionID="2b73f762-264b-40ac-9ade-a1f95c5b2195" # Shared Services
 SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
 az account set --subscription $SubscriptionID
-region1=eastus2 #set region1
+# list all regions 
+#az account list-locations --query "[].{Region: name}" -o table
+region1=canadaeast #set region1
 region2=westus2 #set region2
-rg=lab-vwan #set resource group
-vwanname=vwan-lab #set vWAN name
+rg=lab-avs-demo #set resource group
+vwanname=vwan-avs #set vWAN name
 hub1name=vhub1-$region1 #set Hub1 name
 hub2name=vhub2-$region2 #set Hub2 name
 branch1name=branch1-$region1 #set Branch1 name
@@ -25,7 +27,7 @@ branch2name=branch2-$region2 #set Branch2 name
 vmsize=Standard_B2s #set VM Size for all VMs
 firewallsku=Standard #Azure Firewall SKU Standard or Premium
 username=az-admin
-password=""
+password="LOCAL$$admin2025"
 
 #Selections
 vhubregion2=false #create vHub in region2
@@ -37,6 +39,7 @@ vhub1firewall=true #enter true or false
 vhub2firewall=true #enter true or false
 firewallLogging=true #enter true or false
 vhub1p2s=false #enter true or false
+vhubexrgw=true #enter true or false
 branch1Enabled=true #enter true or false
 branch2Enabled=true #enter true or false
 DNSresolverRegion1=false #enter true or false
@@ -474,13 +477,13 @@ done
 
 #Enable boot diagnostics for all VMs in the resource group (Serial console)
 #Create Storage Account (boot diagnostics + serial console)
-let "randomIdentifier1=$RANDOM*$RANDOM" 
-az storage account create -n sc$randomIdentifier1 -g $rg -l $region1 --sku Standard_LRS --allow-blob-public-access $false -o none
-let "randomIdentifier2=$RANDOM*$RANDOM" 
-az storage account create -n sc$randomIdentifier2 -g $rg -l $region2 --sku Standard_LRS --allow-blob-public-access $false -o none
+#let "randomIdentifier1=$RANDOM*$RANDOM" 
+#az storage account create -n sc$randomIdentifier1 -g $rg -l $region1 --sku Standard_LRS --allow-blob-public-access $false -o none
+#let "randomIdentifier2=$RANDOM*$RANDOM" 
+#az storage account create -n sc$randomIdentifier2 -g $rg -l $region2 --sku Standard_LRS --allow-blob-public-access $false -o none
 #Enable boot diagnostics
-stguri1=$(az storage account show -n sc$randomIdentifier1 -g $rg --query primaryEndpoints.blob -o tsv)
-stguri2=$(az storage account show -n sc$randomIdentifier2 -g $rg --query primaryEndpoints.blob -o tsv)
+#stguri1=$(az storage account show -n sc$randomIdentifier1 -g $rg --query primaryEndpoints.blob -o tsv)
+#stguri2=$(az storage account show -n sc$randomIdentifier2 -g $rg --query primaryEndpoints.blob -o tsv)
 #az vm boot-diagnostics enable --storage $stguri1 --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
 #az vm boot-diagnostics enable --storage $stguri2 --ids $(az vm list -g $rg --query '[?location==`'$region2'`].{id:id}' -o tsv) -o none
 
