@@ -44,7 +44,7 @@ hub2name=vnet-hub2-$region2
 username=az-admin
 vmsize=Standard_B2ms
 firewallsku=Standard
-password="LOCAL$$admin2024"
+password=""
 
 #Set subscription context
 az account set --subscription $SubscriptionID

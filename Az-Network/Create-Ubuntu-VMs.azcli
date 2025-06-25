@@ -1,0 +1,38 @@
+# Parameters (make changes based on your requirements)
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
+#SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
+rg=rg-transitivity
+region1=eastus
+username=az-admin
+password=""
+vmsize=Standard_B2ms
+
+#Set subscription context
+az account set --subscription $SubscriptionID
+
+#Variables
+#mypip="162.207.71.133"
+#mypip="40.114.90.46"
+mypip=$(curl -4 ifconfig.io -s)
+
+# create rg
+az group create -n $rg -l $region1 --output none
+
+az vm create -n VM-hub -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet default --vnet-name hub-vnet --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-Subhub -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet default --vnet-name Sub-hub --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-Spoke1 -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet default --vnet-name spoke1 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-Spoke2 -g $rg --image Ubuntu2204 --public-ip-sku Standard --size $vmsize -l $region1 --subnet default --vnet-name spoke2 --admin-username $username --admin-password $password --no-wait --nsg ""
+
+az vm boot-diagnostics enable --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
+
+nettoolsuri="https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh"
+for vm in `az vm list -g $rg --query "[?storageProfile.imageReference.offer=='UbuntuServer'].name" -o tsv`
+do
+ az vm extension set \
+ --resource-group $rg \
+ --vm-name $vm \
+ --name customScript \
+ --publisher Microsoft.Azure.Extensions \
+ --protected-settings "{\"fileUris\": [\"$nettoolsuri\"],\"commandToExecute\": \"./nettools.sh\"}" \
+ --no-wait
+done
