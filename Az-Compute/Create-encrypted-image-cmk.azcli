@@ -1,0 +1,11 @@
+myResourceGroup="RG-SIG"
+az account set --subscription "2b73f762-264b-40ac-9ade-a1f95c5b2195"
+
+az sig image-version create -g $myResourceGroup \ 
+--gallery-image-version "0.0.2" \
+--location eastus \
+--target-regions eastus=1=standard_lrs \
+--target-region-encryption DES-AVD,0,datades,1 \
+--gallery-name RG_WVD \
+--gallery-image-definition Win11-TrustedLaunch \
+--managed-image "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195/resourceGroups/RG-SIG/providers/Microsoft.Compute/images/WIN11-VM-image-std"

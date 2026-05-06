@@ -1,0 +1,112 @@
+# Parameters (make changes based on your requirements)
+SubscriptionID="af3717f4-48d1-42d5-8b79-453a28496737"  # xe-connectivity
+#SubscriptionID="7964825c-fb12-4906-8cb9-a072355dc0f0"  # fdpo
+rg=rg-lab-bastion
+region1=eastus
+username=az-admin
+password=""
+vmsize=Standard_B2s
+hub1name=hub-$region1
+
+#Set subscription context
+az account set --subscription $SubscriptionID
+
+#Variables
+mypip="162.207.71.133"
+#mypip=$(curl -4 ifconfig.io -s)
+
+# create rg
+az group create -n $rg -l $region1 --output none
+
+
+# create vnet and subnets
+az network vnet create --address-prefixes 172.16.10.0/24 -n $hub1name -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 172.16.10.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name $hub1name -n privateendpoints --address-prefixes 172.16.10.32/27 --output none
+az network vnet subnet create -g $rg --vnet-name $hub1name -n AzureFirewallSubnet --address-prefixes 172.16.10.64/26 --output none
+az network vnet subnet create -g $rg --vnet-name $hub1name -n AzureBastionSubnet --address-prefixes 172.16.10.128/26 --output none
+az network vnet subnet create -g $rg --vnet-name $hub1name -n servers --address-prefixes 172.16.10.192/26 --output none
+
+
+# create a azure bastion private-deployment only
+az network bastion create --name bastion-$region1 --resource-group $rg --location $region1 --sku premium --vnet-name $hub1name --public-ip-address ""
+
+# create spoke 1 vnet and subnets
+az network vnet create --address-prefixes 172.16.11.0/24 -n spoke1-$region1 -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 172.16.11.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name spoke1-$region1 -n servers --address-prefixes 172.16.11.192/26 --output none
+
+# create spoke 2 vnet and subnets
+az network vnet create --address-prefixes 172.16.12.0/24 -n spoke2-$region1 -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 172.16.12.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name spoke2-$region1 -n servers --address-prefixes 172.16.12.192/26 --output none
+
+# create emulated on-prem vnet and subnets
+az network vnet create --address-prefixes 192.168.0.0/24 -n onprem-$region1 -g $rg -l $region1 --subnet-name GatewaySubnet --subnet-prefixes 192.168.0.0/27 --output none
+az network vnet subnet create -g $rg --vnet-name onprem-$region1 -n servers --address-prefixes 192.168.0.32/27 --output none
+
+#create vnet peering from spoke1 to hub
+az network vnet peering create -g $rg -n spoke1-$region1-to-$hub1name --vnet-name spoke1-$region1 --remote-vnet $hub1name --allow-vnet-access yes --output none
+az network vnet peering create -g $rg -n $hub1name-to-spoke1-$region1 --vnet-name $hub1name --remote-vnet spoke1-$region1 --allow-vnet-access yes  --output none
+
+#create vnet peering from spoke2 to hub
+az network vnet peering create -g $rg -n spoke2-$region1-to-$hub1name --vnet-name spoke2-$region1 --remote-vnet $hub1name --allow-vnet-access yes --output none
+az network vnet peering create -g $rg -n $hub1name-to-spoke2-$region1 --vnet-name $hub1name --remote-vnet spoke2-$region1 --allow-vnet-access yes  --output none
+
+#create vnet peering from on-prem to hub
+az network vnet peering create -g $rg -n onprem-$region1-to-$hub1name --vnet-name onprem-$region1 --remote-vnet $hub1name --allow-vnet-access yes --output none
+az network vnet peering create -g $rg -n $hub1name-to-onprem-$region1 --vnet-name $hub1name --remote-vnet onprem-$region1 --allow-vnet-access yes  --output none
+
+# create vm without public IP
+
+az vm create -n VM-Hub -g $rg --image Win2019Datacenter --public-ip-sku Standard --size $vmsize -l $region1 --subnet servers --vnet-name $hub1name --admin-username $username --admin-password $password --no-wait --nsg ""
+#az vm create -n VM-hub -g $rg --image Ubuntu2204 --public-ip-address "" --size $vmsize -l $region1 --subnet servers --vnet-name $hub1name --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-Spoke1-L -g $rg --image Ubuntu2204 --public-ip-address "" --size $vmsize -l $region1 --subnet servers --vnet-name spoke1-$region1 --admin-username $username --admin-password $password --no-wait --nsg ""
+#az vm create -n VM-Spoke2-L -g $rg --image Ubuntu2204 --public-ip-address ""  --size $vmsize -l $region1 --subnet servers --vnet-name spoke2-$region1 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-Spoke2-W -g $rg --image Win2019Datacenter --public-ip-sku Standard --size $vmsize -l $region1 --subnet servers --vnet-name spoke2-$region1 --admin-username $username --admin-password $password --no-wait --nsg ""
+az vm create -n VM-OnPrem -g $rg --image Win2019Datacenter --public-ip-sku Standard --size $vmsize -l $region1 --subnet servers --vnet-name onprem-$region1 --admin-username $username --admin-password $password --no-wait --nsg ""
+
+az vm boot-diagnostics enable --ids $(az vm list -g $rg --query '[?location==`'$region1'`].{id:id}' -o tsv) -o none
+nettoolsuri="https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh"
+for vm in `az vm list -g $rg --query "[?storageProfile.imageReference.offer=='UbuntuServer'].name" -o tsv`
+do
+ az vm extension set \
+ --resource-group $rg \
+ --vm-name $vm \
+ --name customScript \
+ --publisher Microsoft.Azure.Extensions \
+ --protected-settings "{\"fileUris\": [\"$nettoolsuri\"],\"commandToExecute\": \"./nettools.sh\"}" \
+ --no-wait
+done
+
+
+#associate nsg-$hub1name with all subnets in $region1
+
+
+#create NSG:
+az network nsg create --resource-group $rg --name nsg-$hub1name --location $region1 -o none
+az network nsg rule create -g $rg --nsg-name nsg-$hub1name -n 'default-allow-ssh1' --direction Inbound --priority 100 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow inbound SSH" --output none
+az network nsg rule create -g $rg --nsg-name nsg-$hub1name -n 'default-allow-rdp1' --direction Inbound --priority 101 --source-address-prefixes $mypip --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow inbound RDP" --output none
+az network nsg rule create -g $rg --nsg-name nsg-$hub1name -n 'default-allow-rdp2' --direction Inbound --priority 102 --source-address-prefixes 172.16.10.128/26 --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow inbound RDP" --output none
+az network nsg rule create -g $rg --nsg-name nsg-$hub1name -n 'default-allow-ssh2' --direction Inbound --priority 103 --source-address-prefixes 172.16.10.128/26 --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow inbound SSH" --output none
+
+#loop through all vnets and associate nsg-$hub1name with each subnet in $region1
+for vnet in $(az network vnet list -g $rg --query "[?location=='$region1'].name" -o tsv)
+do
+  for subnet in $(az network vnet subnet list -g $rg --vnet-name $vnet --query "[].name" -o tsv)
+  do
+    az network vnet subnet update --id $(az network vnet subnet list -g $rg --vnet-name $vnet --query "[?name=='$subnet'].id" -o tsv) --network-security-group nsg-$hub1name --output none
+  done
+done
+
+#create route table named rt-sandbox-$region1
+az network route-table create -g $rg -n rt-sandbox-$region1 --location $region1 --output none
+# create route default route to 172.16.10.68
+az network route-table route create -g $rg --route-table-name rt-sandbox-$region1 -n default-route --address-prefix 0.0.0.0/0 --next-hop-type VirtualAppliance --next-hop-ip-address 172.16.10.68 --output none
+# create route bastion-bypass address 172.16.10.128/26 via vnet
+az network route-table route create -g $rg --route-table-name rt-sandbox-$region1 -n bastion-bypass --address-prefix 172.16.10.128/26 --next-hop-type vnetlocal --output none
+
+# associate route table to spoke1 and spoke2 servers subnet
+az network vnet subnet update --id $(az network vnet subnet list -g $rg --vnet-name spoke1-$region1 --query "[?name=='servers'].id" -o tsv) --route-table rt-sandbox-$region1 --output none
+az network vnet subnet update --id $(az network vnet subnet list -g $rg --vnet-name spoke2-$region1 --query "[?name=='servers'].id" -o tsv) --route-table rt-sandbox-$region1 --output none
+
+
+#create route table named rt-onprem-$region1
+az network route-table create -g $rg -n rt-onprem-$region1 --location $region1 --output none

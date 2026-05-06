@@ -1,0 +1,36 @@
+# ---------- Terraform ----------
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files (may contain secrets)
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Variable files (often contain secrets / subscription IDs)
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+
+# Plan output
+tfplan
+*.tfplan
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# ---------- Python ----------
+.venv/
+__pycache__/
+*.pyc
+
+# ---------- Editors / OS ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,104 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceGroupName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the resource group to create"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "westus2",
+            "metadata": {
+                "description": "Location for the resource group and Azure Migrate project"
+            }
+        },
+        "projectName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the Azure Migrate project"
+            }
+        },
+        "publicNetworkAccess": {
+            "type": "string",
+            "defaultValue": "Disabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ],
+            "metadata": {
+                "description": "Public network access for the Azure Migrate project"
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2021-04-01",
+            "name": "[parameters('resourceGroupName')]",
+            "location": "[parameters('location')]",
+            "tags": {
+                "Purpose": "Azure Migrate"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "azureMigrateProjectDeployment",
+            "resourceGroup": "[parameters('resourceGroupName')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "type": "Microsoft.Migrate/MigrateProjects",
+                            "apiVersion": "2020-06-01-preview",
+                            "name": "[parameters('projectName')]",
+                            "location": "[parameters('location')]",
+                            "tags": {
+                                "MigrateProjectName": "[parameters('projectName')]"
+                            },
+                            "identity": {
+                                "type": "SystemAssigned"
+                            },
+                            "properties": {
+                                "publicNetworkAccess": "[parameters('publicNetworkAccess')]"
+                            }
+                        }
+                    ],
+                    "outputs": {
+                        "projectResourceId": {
+                            "type": "string",
+                            "value": "[resourceId('Microsoft.Migrate/MigrateProjects', parameters('projectName'))]"
+                        },
+                        "projectName": {
+                            "type": "string",
+                            "value": "[parameters('projectName')]"
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "resourceGroupName": {
+            "type": "string",
+            "value": "[parameters('resourceGroupName')]"
+        },
+        "projectName": {
+            "type": "string",
+            "value": "[parameters('projectName')]"
+        },
+        "location": {
+            "type": "string",
+            "value": "[parameters('location')]"
+        }
+    }
+}

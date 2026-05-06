@@ -1,0 +1,20 @@
+# Required
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Optional overrides (defaults shown)
+# location              = "centralus"
+# resource_group_name   = "rg-avd-centralus"
+# vnet_address_space    = ["10.50.1.0/24"]
+# subnet_address_prefixes = ["10.50.1.0/24"]
+# session_host_count    = 2
+# vm_size               = "Standard_D2s_v5"
+# image_sku             = "win11-25h2-avd"
+# host_pool_name        = "hp-avd-pooled"
+# workspace_name        = "ws-avd"
+# app_group_name        = "ag-avd-remoteapp"
+# local_admin_username  = "az-admin"
+
+# Entra ID object IDs (users or groups) that get RemoteApp + VM login access
+avd_user_object_ids = [
+  # "11111111-1111-1111-1111-111111111111",
+]

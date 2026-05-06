@@ -1,0 +1,20 @@
+resources
+| where type == "microsoft.azurearcdata/sqlserverinstances"
+| extend d=parse_json(properties)
+| extend  SQLEdition=d["edition"]
+| extend  SQLVersion=d["version"]
+| extend InstanceLicenseType=d["licenseType"]
+| extend vCores=d["vCore"]
+| project AzureResourceName=name, derivedmachineName=iff((substring(name, 0, indexof(name, "_"))) == "", name, substring(name, 0, indexof(name, "_"))), SQLEdition, SQLVersion, InstanceLicenseType, vCores
+| join kind=leftouter(
+resources
+| where type == "microsoft.hybridcompute/machines/extensions"
+| where properties.type in ("WindowsAgent.SqlServer","LinuxAgent.SqlServer")
+| extend d=parse_json(properties)
+| extend ExtensionLicenseType=d["settings"]["LicenseType"]
+| extend ESU = iff(notnull(properties.settings.enableExtendedSecurityUpdates), "enabled", "")
+| parse id with * '/providers/Microsoft.HybridCompute/machines/' machineName '/extensions/' *
+| project ExtensionLicenseType, HostName=machineName, ESU
+) on $left.derivedmachineName == $right.HostName
+| project AzureResourceName, HostName, SQLVersion, SQLEdition, ExtensionLicenseType, InstanceLicenseType, vCores, ESU
+ 
