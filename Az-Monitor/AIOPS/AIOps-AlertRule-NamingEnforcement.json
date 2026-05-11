@@ -1,0 +1,80 @@
+{
+  "name": "aiops-alert-naming-enforcement",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "properties": {
+    "displayName": "[AIOps] Enforce Alert Rule Naming Convention",
+    "description": "Denies or audits metric alert rule creation that does not comply with the ME team naming standard. Required format: {prefix}-{service}-{metric}-{severity}-{environment}-{region}. Example: alrt-vm-cpu-high-prod-eastus",
+    "metadata": {
+      "version": "2.0.0",
+      "category": "Monitoring"
+    },
+    "mode": "All",
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Policy Effect",
+          "description": "Deny, Audit or Disabled"
+        },
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "defaultValue": "Audit"
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "comment": "Target only metric alert rules. Log-based alerts (scheduledQueryRules) are out of scope.",
+            "field": "type",
+            "equals": "Microsoft.Insights/metricAlerts"
+          },
+          {
+            "not": {
+              "allOf": [
+                {
+                  "comment": "Rule 1: Name must start with an approved alert type prefix (alrt-, ma-, or metricalrt-).",
+                  "anyOf": [
+                    { "field": "name", "like": "alrt-*" },
+                    { "field": "name", "like": "ma-*" },
+                    { "field": "name", "like": "metricalrt-*" }
+                  ]
+                },
+                {
+                  "comment": "Rule 2: Name must contain a valid severity segment (-high-, -low-, or -med-).",
+                  "anyOf": [
+                    { "field": "name", "contains": "-high-" },
+                    { "field": "name", "contains": "-low-" },
+                    { "field": "name", "contains": "-med-" }
+                  ]
+                },
+                {
+                  "comment": "Rule 3: Name must contain a valid environment segment (-test-, -dev-, or -prod-).",
+                  "anyOf": [
+                    { "field": "name", "contains": "-test-" },
+                    { "field": "name", "contains": "-dev-" },
+                    { "field": "name", "contains": "-prod-" }
+                  ]
+                },
+                {
+                  "comment": "Rule 4: Name must end with an approved Azure region abbreviation.",
+                  "anyOf": [
+                    { "field": "name", "like": "*-eastus" },
+                    { "field": "name", "like": "*-eastus2" },
+                    { "field": "name", "like": "*-westus" },
+                    { "field": "name", "like": "*-westus2" },
+                    { "field": "name", "like": "*-centralus" },
+                    { "field": "name", "like": "*-canadacentral" },
+                    { "field": "name", "like": "*-canadaeast" }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

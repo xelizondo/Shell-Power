@@ -1,0 +1,74 @@
+{
+  "properties": {
+    "roleName": "AIOps Alert Rule Contributor",
+    "description": "Consumer team custom role. Allows teams to create and manage metric alert rules in their own subscriptions and reference ME-managed Action Groups cross-subscription. Explicitly blocks creation or modification of Action Groups to prevent bypassing the centralized ME routing model.",
+    "assignableScopes": [
+      "/providers/Microsoft.Management/managementGroups/mgmt-group-1",
+      "/subscriptions/b84ad984-c030-4e64-a07a-c07da4d066b4",
+      "/subscriptions/2b73f762-264b-40ac-9ade-a1f95c5b2195"
+    ],
+    "permissions": [
+      {
+        "actions": [
+
+          "-----------------------------------------------------------------------",
+          "Action Groups - READ ONLY (cross-subscription reference to ME-managed AGs)",
+          "Must be assigned in BOTH the consumer subscription AND the ME subscription",
+          "to allow alert rules to reference ME action groups cross-subscription.",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Insights/actionGroups/read",
+
+          "-----------------------------------------------------------------------",
+          "Metric Alert Rules - Full lifecycle in consumer's own subscription",
+          "Out of scope: scheduledQueryRules (Log Analytics based) are excluded.",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Insights/metricAlerts/read",
+          "Microsoft.Insights/metricAlerts/write",
+          "Microsoft.Insights/metricAlerts/delete",
+          "Microsoft.Insights/metricAlerts/status/read",
+
+          "-----------------------------------------------------------------------",
+          "Metrics and metric definitions - needed to configure alert conditions",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Insights/metrics/read",
+          "Microsoft.Insights/metricDefinitions/read",
+          "Microsoft.Insights/metricNamespaces/read",
+
+          "-----------------------------------------------------------------------",
+          "Resource and subscription read access",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/resources/read",
+
+          "-----------------------------------------------------------------------",
+          "Policy read access - allows teams to view applicable policy compliance",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Authorization/policyDefinitions/read",
+          "Microsoft.Authorization/policySetDefinitions/read",
+          "Microsoft.Authorization/policyAssignments/read",
+          "Microsoft.PolicyInsights/policyStates/read",
+          "Microsoft.PolicyInsights/policyEvents/queryResults/read"
+
+        ],
+        "notActions": [
+          "-----------------------------------------------------------------------",
+          "Explicitly DENY Action Group write/delete operations.",
+          "Teams must use ME-managed Action Groups — they cannot create their own.",
+          "This is the enforcement complement to the AIOps Deny Webhook Policy.",
+          "-----------------------------------------------------------------------",
+          "Microsoft.Insights/actionGroups/write",
+          "Microsoft.Insights/actionGroups/delete"
+        ],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  "_comment": {
+    "usage": "Assign this role at the landing zone management group so it applies to all consumer subscriptions. Also assign 'Microsoft.Insights/actionGroups/read' (this role) at the ME shared-services subscription or resource group level so consumer teams can reference ME-managed Action Groups cross-subscription.",
+    "crossSubscriptionNote": "Azure ARM requires the identity creating an alert rule to have actionGroups/read on the target action group's subscription. Without this cross-subscription assignment, alert rule creation will fail even if the AG ARM ID is correct.",
+    "important": "Replace <LANDING-ZONE-MANAGEMENT-GROUP-ID> before deployment. Add the ME subscription as an additional assignableScope if needed for the cross-subscription read assignment.",
+    "deploymentNote": "To deploy via Azure CLI: az role definition create --role-definition @AIOps-Consumer-AlertRuleContributor-Role.json"
+  }
+}
