@@ -1,0 +1,96 @@
+{
+  "name": "aiops-alert-naming-opsgenie",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "properties": {
+    "displayName": "[AIOps] Enforce Alert Rule Naming Convention (OpsGenie Format)",
+    "description": "Denies or audits metric alert rule creation that does not comply with the OpsGenie-integrated naming standard. Required format: <Acronym>-OPSGENIE-YES/NO-<ENV>-<MetricName> on <ResourceID>. Examples: ABC-OPSGENIE-YES-PROD-Percentage CPU on my-test-vm | DEF-OPSGENIE-NO-DEV-Blob Capacity on mytest/blob",
+    "metadata": {
+      "version": "1.1.0",
+      "category": "Monitoring"
+    },
+    "mode": "All",
+    "parameters": {
+      "allowedAcronyms": {
+        "type": "Array",
+        "metadata": {
+          "displayName": "Allowed Team Acronyms",
+          "description": "List of approved team/customer acronyms that may appear as the first segment before '-'. Must be uppercase. Example: ['ABC', 'DEF']"
+        },
+        "defaultValue": [ "ABC", "DEF" ]
+      },
+      "allowedEnvironments": {
+        "type": "Array",
+        "metadata": {
+          "displayName": "Allowed Environment Values",
+          "description": "List of approved environment labels that must appear as the third segment (-ENV-). Must be uppercase. Example: ['PROD', 'DEV', 'TEST']"
+        },
+        "defaultValue": [ "PROD", "DEV", "TEST", "UAT", "STG" ]
+      },
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Policy Effect",
+          "description": "Deny, Audit or Disabled. Use Audit first during rollout, then switch to Deny."
+        },
+        "allowedValues": [ "Deny", "Audit", "Disabled" ],
+        "defaultValue": "Audit"
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "comment": "Target only metric alert rules. Log-based alerts (scheduledQueryRules) are out of scope.",
+            "field": "type",
+            "equals": "Microsoft.Insights/metricAlerts"
+          },
+          {
+            "not": {
+              "allOf": [
+                {
+                  "comment": "Rule 1: Name must begin with one of the allowed team acronyms followed by '-'. Evaluated by iterating the allowedAcronyms parameter.",
+                  "count": {
+                    "value": "[parameters('allowedAcronyms')]",
+                    "name": "acronym",
+                    "where": {
+                      "field": "name",
+                      "like": "[concat(current('acronym'), '-*')]"
+                    }
+                  },
+                  "greater": 0
+                },
+                {
+                  "comment": "Rule 2: Name must contain the OpsGenie routing indicator as the second segment — either -OPSGENIE-YES- or -OPSGENIE-NO-.",
+                  "anyOf": [
+                    { "field": "name", "contains": "-OPSGENIE-YES-" },
+                    { "field": "name", "contains": "-OPSGENIE-NO-" }
+                  ]
+                },
+                {
+                  "comment": "Rule 3: Name must contain one of the allowed environment labels as the third segment, bounded by '-' on each side.",
+                  "count": {
+                    "value": "[parameters('allowedEnvironments')]",
+                    "name": "env",
+                    "where": {
+                      "field": "name",
+                      "contains": "[concat('-', current('env'), '-')]"
+                    }
+                  },
+                  "greater": 0
+                },
+                {
+                  "comment": "Rule 4: Name must contain ' on ' — the separator between the metric name (4th segment) and the resource identifier.",
+                  "field": "name",
+                  "contains": " on "
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}
