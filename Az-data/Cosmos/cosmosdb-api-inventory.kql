@@ -1,0 +1,32 @@
+// CMDB inventory for Cosmos DB compatibility APIs and related service families.
+// Keep rawKind and rawCapabilities as evidence when a new capability appears.
+Resources
+| where type =~ 'microsoft.documentdb/databaseaccounts'
+| extend rawKind = tostring(kind), rawCapabilities = tostring(properties.capabilities)
+| extend apiType = case(
+    rawKind =~ 'MongoDB' or rawCapabilities has 'EnableMongo', 'MongoDB API (RU-based)',
+    rawCapabilities has 'EnableCassandra', 'Cassandra API',
+    rawCapabilities has 'EnableGremlin', 'Gremlin API',
+    rawCapabilities has 'EnableTable', 'Table API',
+    rawKind =~ 'GlobalDocumentDB', 'NoSQL API',
+    rawKind =~ 'Parse', 'Parse (legacy)',
+    'Unknown - inspect raw fields')
+| project id, subscriptionId, resourceGroup, name, location, type, apiType,
+          rawKind, rawCapabilities, tags
+| union (
+    Resources
+    | where type =~ 'microsoft.dbforpostgresql/servergroupsv2'
+    | extend apiType = 'PostgreSQL (retired Cosmos DB service)',
+             rawKind = tostring(kind), rawCapabilities = '[]'
+    | project id, subscriptionId, resourceGroup, name, location, type, apiType,
+              rawKind, rawCapabilities, tags
+)
+| union (
+    Resources
+    | where type =~ 'microsoft.documentdb/mongoclusters'
+    | extend apiType = 'Azure DocumentDB / MongoDB-compatible vCore',
+             rawKind = tostring(kind), rawCapabilities = '[]'
+    | project id, subscriptionId, resourceGroup, name, location, type, apiType,
+              rawKind, rawCapabilities, tags
+)
+| order by subscriptionId asc, resourceGroup asc, name asc
