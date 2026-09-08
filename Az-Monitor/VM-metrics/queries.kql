@@ -1,0 +1,38 @@
+// Verify recently reporting computers
+Heartbeat
+| where TimeGenerated > ago(30m)
+| summarize LastHeartbeat=max(TimeGenerated) by Computer, _ResourceId
+| order by LastHeartbeat desc
+
+// Confirm Linux performance counter ingestion
+Perf
+| where TimeGenerated > ago(30m)
+| summarize Samples=count(), LastSample=max(TimeGenerated) by Computer, ObjectName, CounterName
+| order by Computer asc, ObjectName asc, CounterName asc
+
+// CPU and I/O wait trend
+Perf
+| where TimeGenerated > ago(4h)
+| where CounterName in ('% Processor Time', '% IO Wait Time')
+| summarize Value=avg(CounterValue) by bin(TimeGenerated, 5m), Computer, CounterName
+| render timechart
+
+// Available memory and swap trend
+Perf
+| where TimeGenerated > ago(4h)
+| where CounterName in ('Available MBytes Memory', '% Used Memory', 'Used MBytes Swap', '% Used Swap Space')
+| summarize Value=avg(CounterValue) by bin(TimeGenerated, 5m), Computer, CounterName
+| render timechart
+
+// Guest disk latency and queue depth
+Perf
+| where TimeGenerated > ago(4h)
+| where CounterName in ('Avg. Disk sec/Read', 'Avg. Disk sec/Write', 'Avg. Disk Queue Length')
+| summarize Value=avg(CounterValue) by bin(TimeGenerated, 5m), Computer, InstanceName, CounterName
+| render timechart
+
+// Recent warning-and-higher Syslog
+Syslog
+| where TimeGenerated > ago(4h)
+| project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage
+| order by TimeGenerated desc

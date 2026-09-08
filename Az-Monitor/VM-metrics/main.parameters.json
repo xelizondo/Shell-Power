@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "monitoringResourceGroupName": {
+      "value": "rg-monitoring"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "law-linux-performance"
+    },
+    "dataCollectionRuleName": {
+      "value": "dcr-linux-performance"
+    },
+    "retentionInDays": {
+      "value": 30
+    },
+    "samplingFrequencyInSeconds": {
+      "value": 60
+    },
+    "linuxVms": {
+      "value": [
+        {
+          "subscriptionId": "00000000-0000-0000-0000-000000000000",
+          "resourceGroupName": "rg-application",
+          "name": "vm-web-01",
+          "location": "eastus"
+        },
+        {
+          "subscriptionId": "00000000-0000-0000-0000-000000000000",
+          "resourceGroupName": "rg-application",
+          "name": "vm-app-01",
+          "location": "eastus"
+        },
+        {
+          "subscriptionId": "00000000-0000-0000-0000-000000000000",
+          "resourceGroupName": "rg-database",
+          "name": "vm-oracle-01",
+          "location": "eastus"
+        }
+      ]
+    },
+    "sreAgentPrincipalId": {
+      "value": ""
+    },
+    "deploySreAgentRbac": {
+      "value": false
+    }
+  }
+}
