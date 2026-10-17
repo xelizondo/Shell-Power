@@ -1,0 +1,23 @@
+[
+  {
+    "name": "SQL2025",
+    "offer": "sql2025-ws2025",
+    "sku": "enterprise-gen2",
+    "edition": "Enterprise",
+    "licenseType": "AHUB"
+  },
+  {
+    "name": "SQL2022",
+    "offer": "sql2022-ws2022",
+    "sku": "standard-gen2",
+    "edition": "Standard",
+    "licenseType": "AHUB"
+  },
+  {
+    "name": "SQL2017",
+    "offer": "sql2017-ws2019",
+    "sku": "sqldev-gen2",
+    "edition": "Developer",
+    "licenseType": "PAYG"
+  }
+]
