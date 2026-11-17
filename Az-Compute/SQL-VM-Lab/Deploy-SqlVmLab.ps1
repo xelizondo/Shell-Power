@@ -55,7 +55,7 @@ function New-LabPassword {
 }
 
 Write-Host 'Checking provider registrations, regional VM SKU, quotas, and exact Gen2 images. No resources are created.'
-foreach ($namespace in @('Microsoft.Compute', 'Microsoft.Network', 'Microsoft.KeyVault', 'Microsoft.RecoveryServices', 'Microsoft.SqlVirtualMachine', 'Microsoft.DevTestLab')) {
+foreach ($namespace in @('Microsoft.Compute', 'Microsoft.Network', 'Microsoft.KeyVault', 'Microsoft.RecoveryServices', 'Microsoft.SqlVirtualMachine', 'Microsoft.DevTestLab', 'Microsoft.Storage')) {
     $provider = Invoke-LabAz @('provider', 'show', '--namespace', $namespace)
     if ($provider.registrationState -ne 'Registered') {
         throw "Register $namespace in subscription $SubscriptionId before continuing. No automatic registration is performed."

@@ -2,7 +2,27 @@
 
 Deployment history and validation evidence for the [SQL VM lab](README.md).
 
-Status: Deployed
+Status: VM lab deployed; storage addition prepared, not deployed.
+
+## Storage addition approved on 2026-10-19
+
+- Template-only change; no live deployment authorized for this addition.
+- One StorageV2 account in the same lab RG/region, named `sqlbackup` plus a stable
+  resource-group-derived unique suffix, Standard RA-GRS, Hot tier.
+- Hierarchical namespace and anonymous blob access disabled; HTTPS/TLS 1.2 required.
+- Public network access from all networks with Microsoft routing.
+- Private lowercase container `sqlbackups`, confirmed by user because Azure does
+  not allow uppercase container names.
+- Container soft delete, blob soft delete, and versioning disabled.
+- User approved Shared Key access for SAS-based demos. No keys/SAS/SQL credentials
+  or data-plane RBAC grants are created by this change.
+- Storage name, container name, and container URL are exposed in deployment outputs.
+- Microsoft.Storage is included in the existing provider preflight checks.
+- Validation: Bicep compilation passed without template/linter diagnostics;
+  all 14 offline regression checks passed, including new assertions for storage
+  naming, tier, replication, network routing/access, privacy, retention, and outputs.
+  `git diff --check` passed. No authenticated Azure validation or deployment was run
+  for the storage addition.
 
 ## Scope
 

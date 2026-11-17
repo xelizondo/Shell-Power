@@ -17,6 +17,31 @@ Assert-Lab ($template.parameters.adminPasswords.type -eq 'secureObject') 'Passwo
 $labTemplate = $template.resources[1].properties.template
 Assert-Lab ($labTemplate.parameters.adminPasswords.type -eq 'secureObject') 'Passwords must remain secure at resource-group scope.'
 $labResources = @($labTemplate.resources)
+$storageAccounts = @($labResources | Where-Object type -EQ 'Microsoft.Storage/storageAccounts')
+Assert-Lab ($storageAccounts.Count -eq 1) 'Exactly one SQL backup storage account is required.'
+$storage = $storageAccounts[0]
+Assert-Lab ($storage.name -eq "[format('sqlbackup{0}', uniqueString(resourceGroup().id))]") 'Storage name must use sqlbackup plus a stable unique suffix.'
+Assert-Lab ($storage.location -eq '[parameters(''location'')]' -and $storage.kind -eq 'StorageV2') 'Storage must use the lab region and StorageV2 kind.'
+Assert-Lab ($storage.sku.name -eq 'Standard_RAGRS') 'Storage must use Standard RA-GRS.'
+Assert-Lab ($storage.properties.accessTier -eq 'Hot' -and $storage.properties.isHnsEnabled -eq $false) 'Storage must use Hot tier without hierarchical namespace.'
+Assert-Lab ($storage.properties.allowBlobPublicAccess -eq $false -and $storage.properties.allowSharedKeyAccess -eq $true) 'Anonymous access must be disabled while Shared Key SAS remains available.'
+Assert-Lab ($storage.properties.supportsHttpsTrafficOnly -eq $true -and $storage.properties.minimumTlsVersion -eq 'TLS1_2') 'Storage must require HTTPS and TLS 1.2.'
+Assert-Lab ($storage.properties.publicNetworkAccess -eq 'Enabled' -and
+    $storage.properties.networkAcls.defaultAction -eq 'Allow' -and
+    $storage.properties.networkAcls.ipRules.Count -eq 0 -and
+    $storage.properties.networkAcls.virtualNetworkRules.Count -eq 0) 'Storage must allow authenticated access from all networks.'
+Assert-Lab ($storage.properties.routingPreference.routingChoice -eq 'MicrosoftRouting' -and
+    $storage.properties.routingPreference.publishMicrosoftEndpoints -eq $true -and
+    $storage.properties.routingPreference.publishInternetEndpoints -eq $false) 'Storage must use Microsoft network routing.'
+$blobService = @($labResources | Where-Object type -EQ 'Microsoft.Storage/storageAccounts/blobServices')[0]
+Assert-Lab ($blobService.properties.containerDeleteRetentionPolicy.enabled -eq $false -and
+    $blobService.properties.deleteRetentionPolicy.enabled -eq $false -and
+    $blobService.properties.isVersioningEnabled -eq $false) 'Container soft delete, blob soft delete, and versioning must be disabled.'
+$container = @($labResources | Where-Object type -EQ 'Microsoft.Storage/storageAccounts/blobServices/containers')[0]
+Assert-Lab ($container.name -like '*sqlbackups*' -and $container.properties.publicAccess -eq 'None') 'The sqlbackups container must be private.'
+foreach ($outputName in @('backupStorageAccountName', 'backupContainerName', 'backupContainerUrl')) {
+    Assert-Lab ($labTemplate.outputs.ContainsKey($outputName) -and $template.outputs.ContainsKey($outputName)) "Storage output $outputName must be exposed by both templates."
+}
 $vault = @($labResources | Where-Object type -EQ 'Microsoft.RecoveryServices/vaults')[0]
 Assert-Lab ($vault.properties.redundancySettings.standardTierStorageRedundancy -eq 'GeoRedundant') 'Recovery vault must use GRS.'
 Assert-Lab ($vault.properties.redundancySettings.crossRegionRestore -eq 'Disabled') 'The redundancy settings must explicitly leave cross-region restore disabled.'

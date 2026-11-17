@@ -65,6 +65,37 @@ explicitly approved different image or size rather than bypassing that check.
   backup enrollment, restore points, or cross-region restore enablement is created.
   The vault is ready for a later backup demo, not already protecting the VMs.
 
+## SQL backup demo storage
+
+The templates also create one storage account in the same resource group and
+Canada Central region:
+
+- Name: `sqlbackup` plus a 13-character, deterministic `uniqueString` suffix based
+  on the resource group ID (22 lowercase characters total). The name is stable
+  on redeployment; a new account is not generated on every run.
+- Kind **StorageV2**, **Standard**, **RA-GRS** (`Standard_RAGRS`), **Hot** tier.
+- Hierarchical namespace and blob anonymous access disabled.
+- Public network access enabled from **all networks**, using **Microsoft network
+  routing**. Network reachability does not grant permission to read/write blobs.
+- HTTPS required, minimum TLS 1.2.
+- Private container **`sqlbackups`**. Azure requires lowercase container names,
+  so `SQLbackups` cannot be used.
+- Container soft delete, blob soft delete, and blob versioning disabled.
+  Deleted backups will not have these recovery protections; RA-GRS replication
+  does not replace soft delete/versioning.
+- Shared Key access enabled for account-key-signed SAS backup demonstrations.
+  No account keys, SAS tokens, SQL credentials, or backup jobs are generated,
+  stored, or output by this change. Configure a suitably scoped, expiring SAS
+  and SQL credential separately before using SQL Server BACKUP TO URL.
+  No Blob data-plane RBAC assignments are added.
+
+Deployment outputs include `backupStorageAccountName`, `backupContainerName`,
+and `backupContainerUrl`. The existing deployment script prints these alongside
+the VM/vault outputs after deployment. Stored data, transactions, replication,
+and egress can incur additional charges.
+
+This storage addition is **template-only** until explicitly deployed.
+
 ## Prerequisites
 
 1. PowerShell **7.2+ on Windows**, Azure CLI, and its Bicep CLI.
@@ -79,7 +110,7 @@ explicitly approved different image or size rather than bypassing that check.
    Service principals and groups require the corresponding principal-type option.
 5. Registered resource providers: Microsoft.Compute, Microsoft.Network,
    Microsoft.KeyVault, Microsoft.RecoveryServices, Microsoft.SqlVirtualMachine,
-   and Microsoft.DevTestLab. Preflight reports missing registrations and stops;
+   Microsoft.DevTestLab, and Microsoft.Storage. Preflight reports missing registrations and stops;
    it does not modify subscription registrations.
 6. Available regional total and Daldsv6-family quota: **6 vCPUs** for a fresh
    deployment. Three public IPs and three NICs must also fit subscription limits.

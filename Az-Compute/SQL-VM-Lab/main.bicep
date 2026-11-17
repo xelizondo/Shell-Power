@@ -49,4 +49,7 @@ module lab 'modules/lab.bicep' = {
 
 output keyVaultName string = lab.outputs.keyVaultName
 output recoveryServicesVaultName string = lab.outputs.recoveryServicesVaultName
+output backupStorageAccountName string = lab.outputs.backupStorageAccountName
+output backupContainerName string = lab.outputs.backupContainerName
+output backupContainerUrl string = lab.outputs.backupContainerUrl
 output virtualMachines array = lab.outputs.virtualMachines

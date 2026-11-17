@@ -72,6 +72,57 @@ resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
   }
 }
 
+resource backupStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: 'sqlbackup${uniqueString(resourceGroup().id)}'
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_RAGRS'
+  }
+  properties: {
+    accessTier: 'Hot'
+    isHnsEnabled: false
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: true
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+      bypass: 'None'
+      ipRules: []
+      virtualNetworkRules: []
+    }
+    routingPreference: {
+      routingChoice: 'MicrosoftRouting'
+      publishMicrosoftEndpoints: true
+      publishInternetEndpoints: false
+    }
+  }
+}
+
+resource backupBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: backupStorage
+  name: 'default'
+  properties: {
+    containerDeleteRetentionPolicy: {
+      enabled: false
+    }
+    deleteRetentionPolicy: {
+      enabled: false
+    }
+    isVersioningEnabled: false
+  }
+}
+
+resource backupContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: backupBlobService
+  name: 'sqlbackups'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
   name: 'nsg-sql-lab'
   location: location
@@ -150,6 +201,9 @@ module vms 'sql-vm.bicep' = [for (definition, i) in definitions: {
 
 output keyVaultName string = keyVault.name
 output recoveryServicesVaultName string = recoveryVault.name
+output backupStorageAccountName string = backupStorage.name
+output backupContainerName string = backupContainer.name
+output backupContainerUrl string = '${backupStorage.properties.primaryEndpoints.blob}${backupContainer.name}'
 output virtualMachines array = [for (definition, i) in definitions: {
   name: definition.name
   publicIp: vms[i].outputs.publicIp
