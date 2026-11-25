@@ -4,6 +4,54 @@ This Terraform lab creates a Windows Server 2022 VM, Key Vault, and a hierarchic
 
 The VM extension installs AzCopy and registers the `AdlsLabCopy` scheduled task as Local System. Every hour it creates `container1/files` if needed, uploads the contents of `C:\adls-out` to that directory, then downloads its contents to `C:\adls-in`. Both directions include subfolders and overwrite an existing destination only when the source is newer. Nothing is deleted or moved by the job; uploaded files can therefore also be downloaded. Avoid changing files during a transfer.
 
+## Architecture
+
+<!-- mermaid-checked: no \n, no em-dash/en-dash, no {} in labels, subgraphs are id["label"], arrows are -->|"label"|, all subgraphs closed by end, ids unique -->
+```mermaid
+flowchart TD
+    Operator["Lab operator"]
+
+    subgraph Canada["Azure - Canada Central"]
+        Vault[("Key Vault - VM admin password")]
+        Identifier["Storage network identifier public IP"]
+
+        subgraph Network["Virtual network - dedicated subnet"]
+            PublicIP["VM public IP"]
+            NSG["Network security group"]
+            Endpoint["Standard Storage Service Endpoint"]
+
+            subgraph Server["Windows Server 2022 VM"]
+                VM["VM and system-assigned identity"]
+                Out["adls-out folder"]
+                Task["Hourly task - AzCopy"]
+                In["adls-in folder"]
+            end
+        end
+
+        subgraph Perimeter["Network Security Perimeter - enforced"]
+            Rule["Inbound rule - network identifier"]
+            Storage[("ADLS Gen2 - container1 / files")]
+            StorageIdentity["Storage system-assigned identity"]
+        end
+    end
+
+    Operator -->|"RDP from allowed IP"| PublicIP
+    PublicIP --> NSG --> VM
+    Operator -->|"Read password from allowed IP"| Vault
+    VM -->|"Runs scheduled task"| Task
+    Out -->|"Upload source"| Task
+    Task -->|"Download destination"| In
+    Task -->|"Upload and download requests"| Endpoint
+    Endpoint -->|"Storage requests"| Rule
+    Rule -->|"Allowed requests"| Storage
+    Endpoint -.->|"Uses as subnet identifier"| Identifier
+    Rule -.->|"Allows identifier IP"| Identifier
+    VM -.->|"Blob Data Contributor on container1"| Storage
+    Storage -.->|"System-assigned identity"| StorageIdentity
+```
+
+The network identifier is separate from the VM public IP and identifies the subnet's storage traffic; it is not an outbound routing address.
+
 ## Networking
 
 The VM's public IP is for restricted RDP and internet access; it is **not** the address used to identify storage traffic. The dedicated VM subnet has a Standard Service Endpoint with a separate public-IP network identifier. An enforced Network Security Perimeter (NSP) permits that identifier's `/32` and the storage account is created in `SecuredByPerimeter` mode. This authorizes the subnet, not the VM identity alone: do not place other workloads in this subnet. RBAC still controls data operations. This is not a private endpoint; private endpoint traffic would bypass NSP rules.
