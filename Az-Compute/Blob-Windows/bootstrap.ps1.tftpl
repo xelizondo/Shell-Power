@@ -24,3 +24,7 @@ $trigger.Repetition.Duration = $null
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable
 Register-ScheduledTask -TaskName 'AdlsLabCopy' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $labPath 'copy.ps1') -InitializeOnly
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to initialize container directories. See $labPath\transfer.log."
+}

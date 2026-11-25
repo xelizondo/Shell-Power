@@ -17,7 +17,15 @@ output "storage_account_name" {
 }
 
 output "container_url" {
-  value = "https://${local.storage_name}.blob.core.windows.net/container1/files"
+  value = "https://${local.storage_name}.blob.core.windows.net/container1"
+}
+
+output "upload_folder_url" {
+  value = "https://${local.storage_name}.blob.core.windows.net/container1/folder-in"
+}
+
+output "download_folder_url" {
+  value = "https://${local.storage_name}.blob.core.windows.net/container1/folder-out"
 }
 
 output "vm_name" {
