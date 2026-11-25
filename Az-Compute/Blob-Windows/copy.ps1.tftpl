@@ -1,0 +1,75 @@
+$ErrorActionPreference = 'Stop'
+$labPath = 'C:\ProgramData\AdlsLab'
+$logPath = Join-Path $labPath 'transfer.log'
+$azcopy = Join-Path $labPath 'azcopy.exe'
+$blobUrl = 'https://${storage_name}.blob.core.windows.net/container1/files'
+$dfsUrl = 'https://${storage_name}.dfs.core.windows.net/container1/files'
+$env:AZCOPY_AUTO_LOGIN_TYPE = 'MSI'
+$env:AZCOPY_LOG_LOCATION = Join-Path $labPath 'azcopy-logs'
+$env:AZCOPY_JOB_PLAN_LOCATION = Join-Path $labPath 'azcopy-plans'
+
+function Write-LabLog([string]$Message) {
+    Add-Content -Path $logPath -Value "[$(Get-Date -Format o)] $Message"
+}
+
+function Invoke-AzCopy([string[]]$Arguments) {
+    Write-LabLog "Starting AzCopy: $($Arguments -join ' ')"
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $azcopy @Arguments 2>&1 | ForEach-Object { Add-Content -Path $logPath -Value "$_" }
+        $result = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = 'Stop'
+    }
+    if ($result -ne 0) {
+        throw "AzCopy failed with exit code $result. See $logPath and the AzCopy logs."
+    }
+}
+
+try {
+    Write-LabLog 'Starting scheduled transfer.'
+    $token = Invoke-RestMethod -Headers @{ Metadata = 'true' } -Uri 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fstorage.azure.com%2F' -Method Get
+    $headers = @{
+        Authorization   = "Bearer $($token.access_token)"
+        'x-ms-version'  = '2023-11-03'
+        'If-None-Match' = '*'
+    }
+    try {
+        Invoke-RestMethod -Uri "$${dfsUrl}?resource=directory" -Method Put -Headers $headers | Out-Null
+        Write-LabLog 'Created the files directory.'
+    }
+    catch {
+        $response = $_.Exception.Response
+        $status = if ($null -ne $response) { [int]$response.StatusCode } else { 0 }
+        $code = if ($null -ne $response) { $response.Headers['x-ms-error-code'] } else { $null }
+        if (-not (($status -eq 409 -and $code -eq 'PathAlreadyExists') -or
+                  ($status -eq 412 -and $code -eq 'ConditionNotMet'))) {
+            throw
+        }
+        $headers.Remove('If-None-Match')
+        $existing = Invoke-WebRequest -Uri "$${dfsUrl}?action=getStatus" -Method Head -Headers $headers -UseBasicParsing
+        if ($existing.Headers['x-ms-resource-type'] -ne 'directory') {
+            throw 'The existing container1/files path is not a directory.'
+        }
+        Write-LabLog 'The files directory already exists.'
+    }
+
+    if (Get-ChildItem -Path 'C:\adls-out' -File -Recurse -Force | Select-Object -First 1) {
+        Invoke-AzCopy -Arguments @('copy', 'C:\adls-out\*', $blobUrl, '--recursive=true', '--overwrite=ifSourceNewer')
+    }
+    else {
+        Write-LabLog 'No local files to upload.'
+    }
+    Invoke-AzCopy -Arguments @('copy', "$blobUrl/*", 'C:\adls-in', '--recursive=true', '--overwrite=ifSourceNewer')
+    Write-LabLog 'Scheduled transfer completed.'
+}
+catch {
+    $response = $_.Exception.Response
+    if ($null -ne $response) {
+        Write-LabLog "HTTP status: $([int]$response.StatusCode); Azure error code: $($response.Headers['x-ms-error-code']); request ID: $($response.Headers['x-ms-request-id'])"
+    }
+    Write-LabLog "Transfer failed: $($_.Exception.Message)"
+    Write-Error $_
+    exit 1
+}
